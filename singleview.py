@@ -276,7 +276,7 @@ def reconstruction_loss(real_images, generated_images):
 
         self.model()
 
-        ##remove
+
         #with tf.name_scope("conv"):
             #self.features = tf.reshape(self.net_layers[layer], [-1, tf.reduce_prod(self.net_layers[layer].get_shape()[1:])] , name="output")
 
@@ -285,51 +285,3 @@ def reconstruction_loss(real_images, generated_images):
 
 
 
-#by 8------------------ 
-#integrate helper.py, read kitti files, process images, etc///////////////
-#loss function for masks write
-#make main.py complete for inference//////////////////
-#input sizes for each layer////////////////////////
-
-#add references and repo structure to readme
-#test on an image/////////////
-#add debug prints///////////////
-##whyyyyyy 2 output size, #what to do with mask
-#cross entropy for mask
-#multi view.py
-#set this up somewhere on server//////////////////////
-#try the thing tsingu suggested for fully convolutional
-
-#train and test
-
-#what all are these guys comparing with?
-
-
-#--by 9----------------------
-#upload to github
-#remove unwanted stuff
-
-""""
-ADAM solver [35] with
-β
-1
-= 0
-.
-9
-,β
-2
-= 0
-.
-999
-,
-initial learning rate of 0
-.
-0001, step size of 50
-,
-000 and
-a step multiplier
-γ
-= 0
-.
-5.
-""""
