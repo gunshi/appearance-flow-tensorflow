@@ -167,12 +167,6 @@ class Net(object):
         net_layers['deconv12_rs'] = tf.image.resize_bilinear(net_layers['deconv12'], [224, 224], name='deconv12_rs') ##make 224 as param
         net_layers['predmask_SM'] = tf.nn.softmax(net_layers['deconv12_rs'], name='predmask_SM') 
 
-
-
-        
-
-
-
         self.net_layers = net_layers
 
 
@@ -218,10 +212,10 @@ class Net(object):
             weights = self.get_deconv_filter(f_shape)
             if relu==1:
                 deconv = tf.nn.relu(tf.nn.conv2d_transpose(bottom, weights, output_shape,
-                                            strides=strides, padding='VALID')) ##earlier was 'same'
+                                            strides=strides, padding='VALID'))
             else:
                 deconv = tf.nn.conv2d_transpose(bottom, weights, output_shape,
-                                            strides=strides, padding='VALID') ##earlier was 'same'
+                                            strides=strides, padding='VALID')
                 
 
             if debug:
@@ -259,14 +253,11 @@ class Net(object):
         return tf.reduce_mean(tf.abs(real_images - generated_images))
 
 
-    def __init__(self, layer, batch_size, trainable, is_train):
+    def __init__(self, layer, batch_size, trainable):
         self.batch_size = batch_size
-        self.max_frames = max_frames
         self.layer = layer
-        self.weight_path = weight_path
         self.trainable = trainable
-        self.is_train=is_train
-        ##make self keep prob
+        self.is_train=tf.placeholder(tf.bool, name="is_train")
         self.keep_prob = tf.placeholder(tf.float32, name="keep_prob")
 
         mean = [104, 117, 123]

@@ -60,10 +60,11 @@ seqs=[i for i in range(0,FLAGS.numseqs) ] ##can choose spcific seqs also instead
 #break into train and test
 seqstrain=seqs[0:10]
 seqstest=seqs[10:]
-
+imgs_counts=[4540,1100,4660,800,270,2760,1100,1100,4070,1590,1200,920]
 inpH = InputHelper()
 inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)
-train_set, dev_set, sum_no_of_batches = inpH.getDataSets(FLAGS.training_file_path, FLAGS.max_frames, 50, FLAGS.batch_size)
+
+#train_set, dev_set, sum_no_of_batches = inpH.getDataSets(FLAGS.training_file_path, FLAGS.max_frames, 50, FLAGS.batch_size)
 
 # Training
 # ==================================================
@@ -78,24 +79,13 @@ with tf.Graph().as_default():
     sess = tf.Session(config=session_conf)
     print("started session")
     with sess.as_default():
-        convModel = Conv(
-         FLAGS.conv_layer,
-         FLAGS.conv_layer_weight_pretrained_path,
-         FLAGS.batch_size,
-         FLAGS.max_frames,
-         FLAGS.conv_net_training)
 
-        siameseModel = SiameseLSTM(
-            sequence_length=FLAGS.max_frames,
-            input_size=9216,
-            embedding_size=FLAGS.embedding_dim,
-            l2_reg_lambda=FLAGS.l2_reg_lambda,
-            batch_size=FLAGS.batch_size,
-            num_lstm_layers=FLAGS.num_lstm_layers,
-            hidden_unit_dim=FLAGS.hidden_dim,
-            loss=FLAGS.loss,
-            projection=FLAGS.projection,
-            return_outputs=FLAGS.return_outputs)
+
+
+        convModel = Net(
+         FLAGS.conv_layer,
+         FLAGS.batch_size,
+         FLAGS.conv_net_training)
         
 
         # Define Training procedure
@@ -120,7 +110,7 @@ with tf.Graph().as_default():
     print("defined gradient summaries")
     # Output directory for models and summaries
     timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join("/data4/abhijeet/gta/", "runs", timestamp))
+    out_dir = os.path.abspath(os.path.join("//", "runs", timestamp))
     print("Writing to {}\n".format(out_dir))
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
@@ -130,12 +120,9 @@ with tf.Graph().as_default():
     if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
 
-    lstm_savepath="/data4/abhijeet/gta/lstm_outputs"
-    if not os.path.exists(lstm_savepath):
-            os.makedirs(lstm_savepath)
+
 
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=2)
-    #lstm_saver = tf.train.Saver([out1,out2], max_to_keep=2)
 
     # Initialize all variables
     sess.run(tf.global_variables_initializer())
