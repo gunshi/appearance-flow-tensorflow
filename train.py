@@ -25,7 +25,7 @@ tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)
 tf.flags.DEFINE_string("name", "result", "prefix names of the output files(default: result)")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 4, "Batch Size (default: 10)")
+tf.flags.DEFINE_integer("batch_size", 30, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("sample_range", 10, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
@@ -41,6 +41,8 @@ tf.flags.DEFINE_string("summaries_dir", "./../summaries/", "Summary storage")
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
+tf.flags.DEFINE_integer("batches_train", 3000 , "batches for train")
+tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
 
 
 
@@ -177,13 +179,6 @@ with tf.Graph().as_default():
         return summary, loss
 
 
-
-
-    # Generate batches
-    #batches=inpH.batch_iter(
-                #train_set[0], train_set[1], train_set[2], train_set[3], FLAGS.batch_size, FLAGS.num_epochs, convModel.spec, shuffle=True, is_train=False)
-
-    ptr=0
     start_time = time.time()
     train_loss, val_loss = [], []
     train_batch_loss_arr, val_batch_loss_arr = [], []
@@ -195,7 +190,7 @@ with tf.Graph().as_default():
         print("Epoch Number: {}".format(nn))
         epoch_start_time = time.time()
         train_epoch_loss=0.0
-        for kk in range(sum_no_of_batches):
+        for kk in range(FLAGS.batches_train):
             x1_batch, x2_batch, y_batch = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,True, imgs_counts, convModel.spec,nn)
             if len(y_batch)<1:
                 continue
@@ -208,62 +203,36 @@ with tf.Graph().as_default():
 
 
 
-
         # Evaluate on Validataion Data for every epoch
         val_epoch_loss=0.0
-        val_results = []
         print("\nEvaluation:")
-        #dev_batches = inpH.batch_iter(dev_set[0],dev_set[1],dev_set[2],dev_set[3], FLAGS.batch_size, 1, convModel.spec, shuffle=False , is_train=False)
         
         dev_iter=0
-        for (x1_dev_b,x2_dev_b,y_dev_b, dev_video_lengths) in dev_batches:
-            if len(y_dev_b)<1:
-                continue
+
+        for kk in range(FLAGS.batches_test):
+            x1_dev_b, x2_dev_b, y_dev_b = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstest,True, imgs_counts, convModel.spec,nn)
+
             dev_iter += 1
-            summary, batch_val_correct , val_batch_loss, batch_results = dev_step(x1_dev_b, x2_dev_b, y_dev_b, dev_video_lengths, dev_iter,nn)
-
-            pos_samples = np.sum(y_dev_b)
-            sum_pos_samples = sum_pos_samples + pos_samples
-            sum_neg_samples= sum_neg_samples + len(y_dev_b)-pos_samples
-            pos_correct_array = np.multiply(y_dev_b,batch_results)
-            pos_correct=np.sum(pos_correct_array)
-            neg_correct=batch_val_correct-pos_correct
-
-            sum_pos_correct = sum_pos_correct + pos_correct
-            sum_neg_correct = sum_neg_correct + neg_correct
-
-            val_results = np.concatenate([val_results, batch_results])
-            sum_val_correct = sum_val_correct + batch_val_correct
+            summary,  val_batch_loss = dev_step(x1_dev_b, x2_dev_b, y_dev_b,  dev_iter,nn)
 
             val_writer.add_summary(summary, current_step)
             val_epoch_loss = val_epoch_loss + val_batch_loss*len(y_dev_b)
             val_batch_loss_arr.append(val_batch_loss*len(y_dev_b))
         print("val_loss ={}".format(val_epoch_loss/len(dev_set[2])))
-        print("total_val_correct={}/total_val={}".format(sum_val_correct, len(dev_set[2])))
-        print("total_pos_correct={}/total_pos={}".format(sum_pos_correct,sum_pos_samples))
-        print("total_neg_correct={}/total_neg={}".format(sum_neg_correct,sum_neg_samples))
-
-        val_accuracy.append(sum_val_correct*1.0/len(dev_set[2]))
         val_loss.append(val_epoch_loss/len(dev_set[2]))
-        pos_val_accuracy.append(sum_pos_correct*1.0/sum_pos_samples)
-        neg_val_accuracy.append(sum_neg_correct*1.0/sum_neg_samples)
+
 
     
-
-
         # Update stored model
         if current_step % (FLAGS.checkpoint_every) == 0:
-            #if sum_val_correct >= max_validation_correct:
             max_validation_correct = sum_val_correct
             saver.save(sess, checkpoint_prefix, global_step=current_step)
-                #lstm_saver.save(sess, lstm_checkpoint_prefix, global_step=current_step)
             tf.train.write_graph(sess.graph.as_graph_def(), checkpoint_prefix, "graph"+str(nn)+".pb", as_text=False)
             print("Saved model {} with checkpoint to {}".format(nn, checkpoint_prefix))
 
         epoch_end_time = time.time()
         empty=[]
         print("Total time for {} th-epoch is {}\n".format(nn, epoch_end_time-epoch_start_time))
-        save_plot(train_accuracy, val_accuracy, pos_val_accuracy, neg_val_accuracy, 'epochs', 'accuracy', 'Accuracy vs epochs', [-0.1, nn+0.1, 0, 1.01],  ['train','val','pos_val','neg_val' ],'./accuracy_'+str(FLAGS.name))
         save_plot(train_loss, val_loss,empty,empty, 'epochs', 'loss', 'Loss vs epochs', [-0.1, nn+0.1, 0, np.max(train_loss)+0.2],  ['train','val' ],'./loss_'+str(FLAGS.name))
         save_plot(train_batch_loss_arr, val_batch_loss_arr,empty,empty, 'steps', 'loss', 'Loss vs steps', [-0.1, (nn+1)*sum_no_of_batches+0.1, 0, np.max(train_batch_loss_arr)+0.2],  ['train','val' ],'./loss_batch_'+str(FLAGS.name))
 
