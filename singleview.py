@@ -65,9 +65,6 @@ class Net(object):
 
 
         #mean is already subtracted in helper.py as part of preprocessing
-        #mean = tf.reshape(self.mean, [1, 1, 3])
-        #self.input_imgs_m = self.input_imgs - mean
-
         # Conv-Layers
         net_layers={}
         net_layers['Convolution1'] = self.conv(self.input_imgs_m, 3, 3 , 16, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
@@ -81,14 +78,13 @@ class Net(object):
 ##input size!!
         net_layers['fc1'] = self.fc(net_layers['Convolution6'],  , 4096, name='fc1', relu = 1)
         
-##dropout
 
         if self.is_train:
             net_layers['fc1'] = tf.nn.dropout(net_layers['fc1'], self.keep_prob)
         
         net_layers['fc2'] = self.fc(net_layers['fc1'], 4096 , 4096, name='fc2', relu = 1)
         if self.is_train:
-
+            net_layers['fc2'] = tf.nn.dropout(net_layers['fc2'], self.keep_prob)  ##check
 
 
         net_layers['fc3'] = self.fc(self.tform,  , 128, name='fc3', relu = 1)
@@ -255,6 +251,7 @@ class Net(object):
 
     def __init__(self, layer, batch_size, trainable):
         self.batch_size = batch_size
+
         self.layer = layer
         self.trainable = trainable
         self.is_train=tf.placeholder(tf.bool, name="is_train")
