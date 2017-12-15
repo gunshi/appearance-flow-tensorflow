@@ -75,18 +75,14 @@ class Net(object):
         net_layers['Convolution6'] = self.conv(net_layers['Convolution5'], 3, 256 , 512, name= 'Convolution6', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
 
 
-##input size!!
+        ##input sizes!!
         net_layers['fc1'] = self.fc(net_layers['Convolution6'],  , 4096, name='fc1', relu = 1)
-        
-
         if self.is_train:
             net_layers['fc1'] = tf.nn.dropout(net_layers['fc1'], self.keep_prob)
         
         net_layers['fc2'] = self.fc(net_layers['fc1'], 4096 , 4096, name='fc2', relu = 1)
         if self.is_train:
-            net_layers['fc2'] = tf.nn.dropout(net_layers['fc2'], self.keep_prob)  ##check
-
-
+            net_layers['fc2'] = tf.nn.dropout(net_layers['fc2'], self.keep_prob)
         net_layers['fc3'] = self.fc(self.tform,  , 128, name='fc3', relu = 1)
         net_layers['fc4'] = self.fc(net_layers['fc3'],  , 256, name='fc4', relu = 1)
 
@@ -95,12 +91,9 @@ class Net(object):
         net_layers['feat'] = tf.concat([net_layers['drop_out2'], net_layers['fc4']], 0)
         net_layers['fc5'] = self.fc(net_layers['feat'], 4352 , 4096, name='fc5', relu = 1)
         net_layers['fc6'] = self.fc(net_layers['fc5'], 4096 , 4096, name='fc6', relu = 1)
-
         net_layers['fc6_rs'] = tf.reshape(net_layers['fc6'],shape=[-1, 8, 8, 64], name='fc6_rs')
 
-
-        #deconv!!
-
+        #deconv
         net_layers['deconv1'] = upscore = self._upscore_layer(net_layers['fc6_rs'], shape=tf.shape(bgr),
                                            num_classes=256,
                                            debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
@@ -123,11 +116,10 @@ class Net(object):
                                            num_classes=2,
                                            debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)      
 
-       #resize to 224 224 to give flow(deconv6) ! done
-       ##add gxy to flow to get coords !! not needed directly give flow
+       #resize to 224 224 to give flow(deconv6) - not needed-function will handle
+       ##add gxy to flow to get coords !! not needed -function will handle
        #remap using bilinear on (flow(deconv6) and input_imgs) to get predImg
        net_layers['predImg']=bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
-
 
        net_layers['fc7'] = self.fc(net_layers['feat'], 4352 , 1024, name='fc7', relu = 1)
        net_layers['fc8'] = self.fc(net_layers['fc7'], 1024 , 1024, name='fc8', relu = 1)
@@ -164,13 +156,6 @@ class Net(object):
         net_layers['predmask_SM'] = tf.nn.softmax(net_layers['deconv12_rs'], name='predmask_SM') 
 
         self.net_layers = net_layers
-
-
-
-
-
-
-
 
 
 
@@ -263,13 +248,6 @@ class Net(object):
         self.spec = [mean, scale_size]
 
         self.model()
-
-
-        #with tf.name_scope("conv"):
-            #self.features = tf.reshape(self.net_layers[layer], [-1, tf.reduce_prod(self.net_layers[layer].get_shape()[1:])] , name="output")
-
-
-
 
 
 
