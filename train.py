@@ -26,6 +26,7 @@ tf.flags.DEFINE_string("name", "result", "prefix names of the output files(defau
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 4, "Batch Size (default: 10)")
+tf.flags.DEFINE_integer("sample_range", 10, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
 tf.flags.DEFINE_string("loss", "contrastive", "Type of Loss function")
@@ -64,7 +65,7 @@ seqstrain=seqs[0:10]
 seqstest=seqs[10:]
 
 #hard coded for now, add method to compute TODO
-imgs_counts=[4540,1100,4660,800,270,2760,1100,1100,4070,1590,1200,920]
+imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200,11:920}
 inpH = InputHelper()
 inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)
 
@@ -169,7 +170,7 @@ with tf.Graph().as_default():
 
 
 
-        step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts,],  feed_dict)
+        step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
 
         time_str = datetime.datetime.now().isoformat()
  
@@ -179,13 +180,11 @@ with tf.Graph().as_default():
 
 
     # Generate batches
-    batches=inpH.batch_iter(
-                train_set[0], train_set[1], train_set[2], train_set[3], FLAGS.batch_size, FLAGS.num_epochs, convModel.spec, shuffle=True, is_train=False)
+    #batches=inpH.batch_iter(
+                #train_set[0], train_set[1], train_set[2], train_set[3], FLAGS.batch_size, FLAGS.num_epochs, convModel.spec, shuffle=True, is_train=False)
 
     ptr=0
-    max_validation_correct=0.0
     start_time = time.time()
-    train_accuracy, val_accuracy, pos_val_accuracy, neg_val_accuracy = [] , [], [], []
     train_loss, val_loss = [], []
     train_batch_loss_arr, val_batch_loss_arr = [], []
 
@@ -195,35 +194,27 @@ with tf.Graph().as_default():
         current_step = tf.train.global_step(sess, global_step)
         print("Epoch Number: {}".format(nn))
         epoch_start_time = time.time()
-        sum_train_correct=0.0
         train_epoch_loss=0.0
         for kk in range(sum_no_of_batches):
-            x1_batch, x2_batch, y_batch, video_lengths = next(batches)
+            x1_batch, x2_batch, y_batch = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,True, imgs_counts, convModel.spec,nn)
             if len(y_batch)<1:
                 continue
-            summary, train_batch_correct, train_batch_loss =train_step(x1_batch, x2_batch, y_batch, video_lengths)
+            summary, train_batch_loss =train_step(x1_batch, x2_batch, y_batch)
             train_writer.add_summary(summary, current_step)
-            sum_train_correct = sum_train_correct + train_batch_correct
             train_epoch_loss = train_epoch_loss + train_batch_loss* len(y_batch)
             train_batch_loss_arr.append(train_batch_loss*len(y_batch))
         print("train_loss ={}".format(train_epoch_loss/len(train_set[2])))
-        print("total_train_correct={}/total_train={}".format(sum_train_correct, len(train_set[2])))
-        train_accuracy.append(sum_train_correct*1.0/len(train_set[2]))
         train_loss.append(train_epoch_loss/len(train_set[2]))
 
 
 
 
         # Evaluate on Validataion Data for every epoch
-        sum_val_correct=0.0
-        sum_pos_correct=0.0
-        sum_neg_correct=0.0
-        sum_pos_samples=0.0
-        sum_neg_samples=0.0
         val_epoch_loss=0.0
         val_results = []
         print("\nEvaluation:")
-        dev_batches = inpH.batch_iter(dev_set[0],dev_set[1],dev_set[2],dev_set[3], FLAGS.batch_size, 1, convModel.spec, shuffle=False , is_train=False)
+        #dev_batches = inpH.batch_iter(dev_set[0],dev_set[1],dev_set[2],dev_set[3], FLAGS.batch_size, 1, convModel.spec, shuffle=False , is_train=False)
+        
         dev_iter=0
         for (x1_dev_b,x2_dev_b,y_dev_b, dev_video_lengths) in dev_batches:
             if len(y_dev_b)<1:
