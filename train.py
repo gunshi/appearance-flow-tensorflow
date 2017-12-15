@@ -62,6 +62,8 @@ seqs=[i for i in range(0,FLAGS.numseqs) ] ##can choose spcific seqs also instead
 #break into train and test
 seqstrain=seqs[0:10]
 seqstest=seqs[10:]
+
+#hard coded for now, add method to compute TODO
 imgs_counts=[4540,1100,4660,800,270,2760,1100,1100,4070,1590,1200,920]
 inpH = InputHelper()
 inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)
@@ -85,20 +87,14 @@ with tf.Graph().as_default():
          FLAGS.conv_layer,
          FLAGS.batch_size,
          FLAGS.conv_net_training)
-        
-
-
-
-
-
 
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
         learning_rate=tf.train.exponential_decay(1e-5, global_step, sum_no_of_batches*5, 0.95, staircase=False, name=None)
         optimizer = tf.train.AdamOptimizer(FLAGS.lr)
-        print("initialized convmodel and siamesemodel object")
+        print("initialized Net object")
     
-    grads_and_vars=optimizer.compute_gradients(siameseModel.loss)
+    grads_and_vars=optimizer.compute_gradients(convModel.loss)
     tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
     # keep track of gradient values and sparsity (optional)
@@ -114,7 +110,7 @@ with tf.Graph().as_default():
     print("defined gradient summaries")
     # Output directory for models and summaries
     timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join("//", "runs", timestamp))
+    out_dir = os.path.abspath(os.path.join("./../", "runs", timestamp))
     print("Writing to {}\n".format(out_dir))
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
@@ -149,57 +145,38 @@ with tf.Graph().as_default():
     train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/train', graph=tf.get_default_graph())
     val_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/val' , graph=tf.get_default_graph())
 
-    def train_step(x1_batch, x2_batch, y_batch, video_lengths):
+    def train_step(x1_batch, x2_batch, tform_batch):
 
         #A single training step
 
-        [x1_batch] = sess.run([convModel.features],  feed_dict={convModel.input_imgs: x1_batch})
-        [x2_batch] = sess.run([convModel.features],  feed_dict={convModel.input_imgs: x2_batch})
+        feed_dict={convModel.input_imgs: x1_batch,
+                    convModel.tgt_imgs: x2_batch
+                    convModel.tform: tform_batch }
 
-        feed_dict = {
-                         siameseModel.input_x1: x1_batch,
-                         siameseModel.input_x2: x2_batch,
-                         siameseModel.input_y: y_batch,
-                         siameseModel.dropout_keep_prob: FLAGS.dropout_keep_prob,
-                         siameseModel.video_lengths: video_lengths,
-        }
 
-        out1, out2, _, step, loss, dist, summary = sess.run([siameseModel.out1, siameseModel.out2, tr_op_set, global_step, siameseModel.loss, siameseModel.distance, summaries_merged],  feed_dict)
+        outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
         time_str = datetime.datetime.now().isoformat()
-        d=compute_distance(dist, FLAGS.loss)
-        correct = y_batch==d
-        #print(out1, out2)
-        #print(video_lengths)
-        #print("TRAIN {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, correct))
-        print(y_batch, dist, d)
-        return summary, np.sum(correct), loss
+ 
+        return summary, loss
 
-    def dev_step(x1_batch, x2_batch, y_batch, video_lengths, dev_iter, epoch):
+    def dev_step(x1_batch, x2_batch, y_batch, dev_iter, epoch):
 
         #A single training step
 
-        [x1_batch] = sess.run([convModel.features],  feed_dict={convModel.input_imgs: x1_batch})
-        [x2_batch] = sess.run([convModel.features],  feed_dict={convModel.input_imgs: x2_batch})
+       feed_dict={convModel.input_imgs: x1_batch,
+                    convModel.tgt_imgs: x2_batch
+                    convModel.tform: tform_batch }
 
-        feed_dict = {
-                         siameseModel.input_x1: x1_batch,
-                         siameseModel.input_x2: x2_batch,
-                         siameseModel.input_y: y_batch,
-                         siameseModel.dropout_keep_prob: FLAGS.dropout_keep_prob,
-                         siameseModel.video_lengths: video_lengths,
 
-        }
 
-        step, loss, dist, summary, out1, out2 = sess.run([global_step, siameseModel.loss, siameseModel.distance, summaries_merged,siameseModel.out1,siameseModel.out2],  feed_dict)
-        #np.save(lstm_savepath+'/out1_'+str(dev_iter)+'_'+str(epoch),out1)
-        #np.save(lstm_savepath+'/out2_'+str(dev_iter)+'_'+str(epoch),out2)
-        #np.save(lstm_savepath+'/y_'+str(dev_iter)+'_'+str(epoch),y_batch)
+        step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts,],  feed_dict)
+
         time_str = datetime.datetime.now().isoformat()
-        d=compute_distance(dist, FLAGS.loss)
-        correct = y_batch==d
-        #print("DEV {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, correct))
-        #print(y_batch, dist, d)
-        return summary, np.sum(correct), loss, correct
+ 
+        return summary, loss
+
+
+
 
     # Generate batches
     batches=inpH.batch_iter(

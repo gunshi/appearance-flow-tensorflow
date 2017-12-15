@@ -241,7 +241,7 @@ class Net(object):
         self.trainable = trainable
         self.is_train=tf.placeholder(tf.bool, name="is_train")
         self.keep_prob = tf.placeholder(tf.float32, name="keep_prob")
-
+        self.tgt_imgs = tf.placeholder(tf.float32, shape = [None, 224, 224, 3], name = "tgt_imgs")
         mean = [104, 117, 123]
         scale_size = (224,224)
         self.mean = tf.constant([104, 117, 123], dtype=tf.float32)
@@ -249,5 +249,12 @@ class Net(object):
 
         self.model()
 
+        ##assign
+        ##assert and cast them to same size!!!!
+        self.tgts=self.net_layers['predImg']
+        with tf.name_scope("loss"):
+          self.loss = self.reconstruction_loss(self.tgts, self.tgt_imgs)
 
+
+      tf.summary.scalar('loss', self.loss)
 
