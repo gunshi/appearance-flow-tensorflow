@@ -251,12 +251,12 @@ class Net(object):
         return tf.get_variable(name="up_filter", initializer=init,
                                shape=weights.shape)
 
-def reconstruction_loss(real_images, generated_images):
-    """
-    The reconstruction loss is defined as the sum of the L1 distances
-    between the target images and their generated counterparts
-    """
-    return tf.reduce_mean(tf.abs(real_images - generated_images))
+    def reconstruction_loss(real_images, generated_images):
+        """
+        The reconstruction loss is defined as the sum of the L1 distances
+        between the target images and their generated counterparts
+        """
+        return tf.reduce_mean(tf.abs(real_images - generated_images))
 
 
     def __init__(self, layer, batch_size, trainable, is_train):
@@ -271,7 +271,7 @@ def reconstruction_loss(real_images, generated_images):
 
         mean = [104, 117, 123]
         scale_size = (224,224)
-        self.mean = tf.constant([104, 117, 123], dtype=tf.float32) # CHANGE from other (main file) -------------------
+        self.mean = tf.constant([104, 117, 123], dtype=tf.float32)
         self.spec = [mean, scale_size]
 
         self.model()
