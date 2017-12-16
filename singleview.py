@@ -61,7 +61,7 @@ class Net(object):
         self.input_imgs = tf.placeholder(tf.float32, shape = [None, 224, 224, 3], name = "input_imgs")
         self.input_batch_size = tf.shape(self.input_imgs)[0]  # Returns a scalar `tf.Tensor`
         assert(self.input_batch_size == self.batch_size)
-        self.tform = tf.placeholder(tf.float32, shape = [None, 12], name = "tform")
+        self.tform = tf.placeholder(tf.float32, shape = [None, 20], name = "tform")
 
 
         #mean is already subtracted in helper.py as part of preprocessing
@@ -83,8 +83,9 @@ class Net(object):
         net_layers['fc2'] = self.fc(net_layers['fc1'], 4096 , 4096, name='fc2', relu = 1)
         if self.is_train:
             net_layers['fc2'] = tf.nn.dropout(net_layers['fc2'], self.keep_prob)
-        net_layers['fc3'] = self.fc(self.tform,  , 128, name='fc3', relu = 1)
-        net_layers['fc4'] = self.fc(net_layers['fc3'],  , 256, name='fc4', relu = 1)
+
+        net_layers['fc3'] = self.fc(self.tform, 20 , 128, name='fc3', relu = 1)
+        net_layers['fc4'] = self.fc(net_layers['fc3'], 128 , 256, name='fc4', relu = 1)
 
 
 
