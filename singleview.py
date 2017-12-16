@@ -89,7 +89,7 @@ class Net(object):
 
 
 
-        net_layers['feat'] = tf.concat([net_layers['drop_out2'], net_layers['fc4']], 0)
+        net_layers['feat'] = tf.concat([net_layers['fc2'], net_layers['fc4']], 0)
         net_layers['fc5'] = self.fc(net_layers['feat'], 4352 , 4096, name='fc5', relu = 1)
         net_layers['fc6'] = self.fc(net_layers['fc5'], 4096 , 4096, name='fc6', relu = 1)
         net_layers['fc6_rs'] = tf.reshape(net_layers['fc6'],shape=[-1, 8, 8, 64], name='fc6_rs')
@@ -115,7 +115,7 @@ class Net(object):
                                            debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
         net_layers['deconv6'] = upscore = self._upscore_layer(net_layers['deconv5'], shape=tf.shape(bgr),
                                            num_classes=2,
-                                           debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)      
+                                           debug=debug, name='deconv1', ksize=3, stride=1, pad_input=1)      
 
        #resize to 224 224 to give flow(deconv6) - not needed-function will handle
        ##add gxy to flow to get coords !! not needed -function will handle
