@@ -1,14 +1,20 @@
-Tensorflow Implementation (Work in Progress)
+Tensorflow Implementation  for "View Synthesis by Appearance Flow" (Work in Progress)
 
 Notes: (Differences from published paper)
+
 -Fully convolutional for KITTI (Please see discussion
 :[https://github.com/tinghuiz/appearance-flow/issues/7] )
+
+
 -Relative Transforms (Please see
 :[https://github.com/tinghuiz/appearance-flow/issues/8] )
 
 References:
+
 -bilinear sampling code integrated from :
 https://github.com/iwyoo/tf-bilinear_sampler
+
+
 -Deconv layers weights initialised with Bilinear Sampling weights similar to
 popular FCN archiecture implementations
 
