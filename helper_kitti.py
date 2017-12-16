@@ -13,7 +13,6 @@ import imgaug as ia
 from imgaug import augmenters as iaa
 from imgaug import parameters as iap
 import matplotlib
-from random import random
 matplotlib.use('Agg')
 import matplotlib.pyplot as pyplot
 #reload(sys)
@@ -44,20 +43,21 @@ class InputHelper(object):
                 odom_list.append(val)
             self.odomDict[seq]=odom_list
 
-    def getKittiBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch):
+    def getKittiBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch,  get_img_tforms=1):
         lenseq=len(seq_list)
-        seq_idx=random.randint(0,lenseq+1)
+        seq_idx=np.random.randint(0,lenseq+1)
         seq_num=seq_list[seq_idx]
         labels=[]
         imgpaths_src=[]
         imgpaths_tgt=[]
         seq_path=self.kitti_parentpath+"%02d/" % (seq_num,)
         tforms=[]
+        tforms_imgs=[]
         seq_imgs_num=img_num_dict[seq_num]
         odomlist=self.odomDict[seq_num]
         for x in range(batch_size):
-            src_img_num=random.randint(0,seq_imgs_num) #index check
-            radius_num=random.randint(1,radius+1) #index check for image naming
+            src_img_num=np.random.randint(0,seq_imgs_num) #index check
+            radius_num=np.random.randint(1,sample_range+1) #index check for image naming
             odom_src=odomlist[src_img_num]
             odom_src=np.reshape(odom_src,(3,4))
             print(odom_src)
@@ -75,15 +75,24 @@ class InputHelper(object):
             odom_tgt=odomlist[tgt_img_num]
             odom_tgt=np.reshape(odom_tgt,(3,4))
             newrow = [0,0,0,1]
-            odom_tgt_4x4 = numpy.vstack([odom_tgt, newrow])
-            odom_src_4x4 = numpy.vstack([odom_src, newrow])
+            odom_tgt_4x4 = np.vstack([odom_tgt, newrow])
+            odom_src_4x4 = np.vstack([odom_src, newrow])
             odom_src_inv=linalg.inv(odom_src_4x4)
-            #src inv into tgt
+            #src inv into tgt - relative transform
             rel_odom_src_tgt=np.matmul(odom_src_inv,odom_tgt_4x4)
-            print(odom_tgt)
+            ##convert this to euler
+            rel_tform_rot=rel_odom_src_tgt[0:3,0:3]
+            rx,ry,rz = euler_from_matrix(rel_tform_rot)
+            rel_tform_vec = [ rel_odom_src_tgt[0,4], rel_odom_src_tgt[1,4], rel_odom_src_tgt[2,4], rx, ry, rz]
+
             rel_tform_vec=rel_odom_src_tgt[0:3,:]
-            rel_tform_vec=rel_tform_vec.flatten() ##??
+            rel_tform_vec=rel_tform_vec.flatten()
+            heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0],1))
+            widthwise = np.tile(heightwise,(1,conv_model_spec[1][1]))
+            print(widthwise.shape)
+            tforms_imgs.append(widthwise)
             tforms.append(rel_tform_vec)
+
             src_img_path=seq_path+ 'image_2/' +'%06d.png' % (src_img_num,)
             tgt_img_path=seq_path+ 'image_2/' +'%06d.png' % (tgt_img_num,)
             imgpaths_src.append(src_img_path)
@@ -91,27 +100,25 @@ class InputHelper(object):
 
         imgslist = self.load_preprocess_images_kitti(imgpaths_src,imgpaths_tgt,conv_model_spec,epoch) #return src, tgt
 
+        if get_img_tforms==1:
 
+            return imgslist[0],imgslist[1],tforms_imgs
 
+        else:
+            return imgslist[0],imgslist[1],tforms
 
-        return imgslist[0],imgslist[1],tforms
-            #call load preprocess type function to get actual images
-            #tform read
 
 
     def load_preprocess_images_kitti(self, source_paths, target_paths, conv_model_spec, epoch, is_train=True):
         batch1_seq, batch2_seq = [], []
-        # for side1_img_paths, side2_img_paths in zip(side1_paths, side2_paths):
-        #     seq_det1 = self.seq_det[epoch%5] # call this for each batch again, NOT only once at the start
-        #     seq_det2 = self.seq_det[epoch%5]
-        crop_window=random.randint(0,3) #index check
+        crop_window=np.random.randint(0,3)
 
-        for side1_img_path,side2_img_path in zip(side1_img_paths, side2_img_paths):
-            img_org = misc.imread(side1_img_path)
-            img_normalized = self.normalize_input(img_resized, conv_model_spec,crop_window)
+        for src_path,tgt_path in zip(source_paths, target_paths):
+            img_org = misc.imread(src_path)
+            img_normalized = self.normalize_input(img_org, conv_model_spec,crop_window)
             batch1_seq.append(img_normalized)
 
-            img_org = misc.imread(side2_img_path)
+            img_org = misc.imread(tgt_path)
             img_normalized = self.normalize_input(img_org, conv_model_spec,crop_window)
             batch2_seq.append(img_normalized)
 

@@ -135,7 +135,7 @@ class Net(object):
                 new_shape = [shape[0], shape[1], shape[2], num_classes]
 
 
-            deconv_shape = tf.stack([self.batch_size, new_shape[1]+1, new_shape[2]+1, num_classes])
+            deconv_shape = tf.stack([self.batch_size, new_shape[1], new_shape[2], num_classes])
 
 
             #logging.debug("Layer: %s, Fan-in: %d" % (name, in_features))
