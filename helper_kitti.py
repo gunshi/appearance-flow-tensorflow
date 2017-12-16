@@ -16,24 +16,24 @@ import matplotlib
 from random import random
 matplotlib.use('Agg')
 import matplotlib.pyplot as pyplot
-reload(sys)
-sys.setdefaultencoding("utf-8")
+#reload(sys)
+#sys.setdefaultencoding("utf-8")
 import numpy.linalg as linalg
-import transformations
+from transformations import euler_from_matrix
 
 
 
 class InputHelper(object):
 
-    def setup(kitti_odompath, kitti_parentpath, seq_list):
+    def setup(self,kitti_odompath, kitti_parentpath, seq_list):
         self.odomDict={}
         self.kitti_odompath = kitti_odompath
         self.kitti_parentpath = kitti_parentpath
 
-        setOdomInfo(seq_list)
+        self.setOdomInfo(seq_list)
 
 
-    def setOdomInfo(seq_list):
+    def setOdomInfo(self,seq_list):
 
         for seq in seq_list:
             append_seqname="%02d.txt" % (seq,)
@@ -41,10 +41,10 @@ class InputHelper(object):
             for line in open(self.kitti_odompath+append_seqname): ##+'/'    ???
                 val=line.split()
                 val=[float(ele) for ele in val]
-                odomlist.append(val)
-            self.odomDict[seq]=odomlist
+                odom_list.append(val)
+            self.odomDict[seq]=odom_list
 
-    def getKittiBatch(batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch, get_img_tforms=1):
+    def getKittiBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch):
         lenseq=len(seq_list)
         seq_idx=random.randint(0,lenseq+1)
         seq_num=seq_list[seq_idx]
@@ -53,7 +53,6 @@ class InputHelper(object):
         imgpaths_tgt=[]
         seq_path=self.kitti_parentpath+"%02d/" % (seq_num,)
         tforms=[]
-        tforms_imgs=[]
         seq_imgs_num=img_num_dict[seq_num]
         odomlist=self.odomDict[seq_num]
         for x in range(batch_size):
@@ -82,19 +81,8 @@ class InputHelper(object):
             #src inv into tgt
             rel_odom_src_tgt=np.matmul(odom_src_inv,odom_tgt_4x4)
             print(odom_tgt)
-
-            ##convert this to euler
-            rel_tform_rot=rel_odom_src_tgt[0:3,0:3]
-            rx,ry,rz = euler_from_matrix(rel_tform_rot)
-            rel_tform_vec = [ rel_odom_src_tgt[0,4], rel_odom_src_tgt[1,4], rel_odom_src_tgt[2,4], rx, ry, rz]
-
-
-            #rel_tform_vec=rel_odom_src_tgt[0:3,:]
-            #rel_tform_vec=rel_tform_vec.flatten()
-            heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0],1))
-            widthwise = np.tile(heightwise,(1,conv_model_spec[1][1]))
-            print(widthwise.shape)
-            tforms_imgs.append(widthwise)
+            rel_tform_vec=rel_odom_src_tgt[0:3,:]
+            rel_tform_vec=rel_tform_vec.flatten() ##??
             tforms.append(rel_tform_vec)
             src_img_path=seq_path+ 'image_2/' +'%06d.png' % (src_img_num,)
             tgt_img_path=seq_path+ 'image_2/' +'%06d.png' % (tgt_img_num,)
@@ -103,12 +91,12 @@ class InputHelper(object):
 
         imgslist = self.load_preprocess_images_kitti(imgpaths_src,imgpaths_tgt,conv_model_spec,epoch) #return src, tgt
 
-        if get_img_tforms==1:
 
-            return imgslist[0],imgslist[1],tforms_imgs
 
-        else:
-            return imgslist[0],imgslist[1],tforms
+
+        return imgslist[0],imgslist[1],tforms
+            #call load preprocess type function to get actual images
+            #tform read
 
 
     def load_preprocess_images_kitti(self, source_paths, target_paths, conv_model_spec, epoch, is_train=True):

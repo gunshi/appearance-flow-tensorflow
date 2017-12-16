@@ -6,7 +6,7 @@ import numpy as np
 from scipy import misc
 from bilinear_sampler import bilinear_sampler
 
-class Net(object): 
+class Net(object):
     def initalize(self, sess):
         pre_trained_weights = np.load(open(self.weight_path, "rb"), encoding="latin1").item()
         keys = sorted(pre_trained_weights.keys())
@@ -18,7 +18,7 @@ class Net(object):
             with tf.variable_scope(k, reuse=True):
                 temp = tf.get_variable('biases')
                 sess.run(temp.assign(pre_trained_weights[k]['biases']))
-            
+
     def conv(self, input_, filter_size, in_channels, out_channels, name, strides, padding, groups, pad_input=1):
         if pad_input==1:
             paddings = tf.constant([ [0, 0], [1, 1,], [1, 1], [0, 0] ])
@@ -48,14 +48,14 @@ class Net(object):
             return tf.nn.relu(tf.nn.bias_add(tf.matmul(input_, filt), bias))
         else:
             return tf.nn.bias_add(tf.matmul(input_, filt), bias)
-        
+
 
     def pool(self, input_, padding, name):
         return tf.nn.max_pool(input_, ksize=[1,3,3,1], strides=[1,2,2,1], padding=padding, name= name)
 
 
 
-    def model(self):    
+    def model(self):
 
         ##debug=True?
 
@@ -65,7 +65,7 @@ class Net(object):
         assert(self.input_batch_size == self.batch_size)
         self.tform = tf.placeholder(tf.float32, shape = [None, 224, 224, 6], name = "tform")
 
-        net_layers['input_stack'] = tf.concat([self.input_imgs, self.tform, 3)
+        net_layers['input_stack'] = tf.concat([self.input_imgs, self.tform], 3)
 
         #mean is already subtracted in helper.py as part of preprocessing
         # Conv-Layers
@@ -75,7 +75,7 @@ class Net(object):
         net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 3, 64 , 128, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 128 , 256, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution5'] = self.conv(net_layers['Convolution4'], 3, 256 , 512, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        
+
 
 
         #deconv
@@ -99,20 +99,18 @@ class Net(object):
                                            debug=debug, name='deconv5', ksize=3, stride=2, pad_input=1)
         net_layers['deconv6'] = upscore = self._upscore_layer(net_layers['deconv5'], shape=tf.shape(bgr),
                                            num_classes=2,
-                                           debug=debug, name='deconv6', ksize=3, stride=1, pad_input=1)      
+                                           debug=debug, name='deconv6', ksize=3, stride=1, pad_input=1)
 
        #resize to 224 224 to give flow(deconv6) - not needed-function will handle
        ##add gxy to flow to get coords !! not needed -function will handle
        #remap using bilinear on (flow(deconv6) and input_imgs) to get predImg
-       net_layers['predImg']=bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
+        net_layers['predImg']=bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
 
         self.net_layers = net_layers
 
 
 
-   def _upscore_layer(self, bottom, shape,
-                       num_classes, name, debug,
-                       ksize=3, stride=2, pad_input=1, relu=1):
+    def _upscore_layer(self, bottom, shape,num_classes, name, debug, ksize=3, stride=2, pad_input=1, relu=1):
 
         if pad_input==1:
             paddings = tf.constant([ [0, 0], [1, 1,], [1, 1], [0, 0] ])
@@ -148,7 +146,7 @@ class Net(object):
             else:
                 deconv = tf.nn.conv2d_transpose(bottom, weights, output_shape,
                                             strides=strides, padding='VALID')
-                
+
 
             if debug:
                 deconv = tf.Print(deconv, [tf.shape(deconv)],
@@ -207,5 +205,5 @@ class Net(object):
           self.loss = self.reconstruction_loss(self.tgts, self.tgt_imgs)
 
 
-      tf.summary.scalar('loss', self.loss)
+        tf.summary.scalar('loss', self.loss)
 

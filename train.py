@@ -7,10 +7,10 @@ import os
 import time
 import datetime
 import gc
-#from helper import InputHelper, save_plot, compute_distance
+from helper_kitti import InputHelper, save_plot
 import gzip
 from random import random
-from singleview import Net
+from kitti_single import Net
 
 # Parameters
 # ==================================================
@@ -96,7 +96,7 @@ with tf.Graph().as_default():
         learning_rate=tf.train.exponential_decay(1e-5, global_step, sum_no_of_batches*5, 0.95, staircase=False, name=None)
         optimizer = tf.train.AdamOptimizer(FLAGS.lr)
         print("initialized Net object")
-    
+
     grads_and_vars=optimizer.compute_gradients(convModel.loss)
     tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
@@ -128,7 +128,7 @@ with tf.Graph().as_default():
 
     # Initialize all variables
     sess.run(tf.global_variables_initializer())
-    
+
     #Fix weights for Conv Layers
     #convModel.initalize(sess)
 
@@ -153,21 +153,21 @@ with tf.Graph().as_default():
         #A single training step
 
         feed_dict={convModel.input_imgs: x1_batch,
-                    convModel.tgt_imgs: x2_batch
+                    convModel.tgt_imgs: x2_batch,
                     convModel.tform: tform_batch }
 
 
         outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
         time_str = datetime.datetime.now().isoformat()
- 
+
         return summary, loss
 
-    def dev_step(x1_batch, x2_batch, y_batch, dev_iter, epoch):
+    def dev_step(x1_batch, x2_batch, tform_batch, dev_iter, epoch):
 
         #A single training step
 
-       feed_dict={convModel.input_imgs: x1_batch,
-                    convModel.tgt_imgs: x2_batch
+        feed_dict={convModel.input_imgs: x1_batch,
+                    convModel.tgt_imgs: x2_batch,
                     convModel.tform: tform_batch }
 
 
@@ -175,7 +175,7 @@ with tf.Graph().as_default():
         step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
 
         time_str = datetime.datetime.now().isoformat()
- 
+
         return summary, loss
 
 
@@ -206,7 +206,7 @@ with tf.Graph().as_default():
         # Evaluate on Validataion Data for every epoch
         val_epoch_loss=0.0
         print("\nEvaluation:")
-        
+
         dev_iter=0
 
         for kk in range(FLAGS.batches_test):
@@ -222,7 +222,7 @@ with tf.Graph().as_default():
         val_loss.append(val_epoch_loss/len(dev_set[2]))
 
 
-    
+
         # Update stored model
         if current_step % (FLAGS.checkpoint_every) == 0:
             max_validation_correct = sum_val_correct
