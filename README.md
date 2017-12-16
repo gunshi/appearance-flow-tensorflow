@@ -1,12 +1,16 @@
 Tensorflow Implementation (Work in Progress)
 
-Notes:
--Fully convolutional (Please see discussion : )
--Relative Transforms (Please see : )
+Notes: (Differences from published paper)
+-Fully convolutional for KITTI (Please see discussion
+:[https://github.com/tinghuiz/appearance-flow/issues/7] )
+-Relative Transforms (Please see
+:[https://github.com/tinghuiz/appearance-flow/issues/8] )
 
 References:
 -bilinear sampling code integrated from :
--Deconv layers weights initialised with 
+https://github.com/iwyoo/tf-bilinear_sampler
+-Deconv layers weights initialised with Bilinear Sampling weights similar to
+popular FCN archiecture implementations
 
 TODO:
 -tweak code for multi-view prediction
@@ -15,7 +19,7 @@ TODO:
 
 Contributions and suggestions welcome!
 
-Caffe Implementation provided by authors at: [https://github.com/tinghuiz/appearance-flow] (https://github.com/tinghuiz/appearance-flow)
+Caffe Implementation provided by authors at: [https://github.com/tinghuiz/appearance-flow] 
 
 
 
