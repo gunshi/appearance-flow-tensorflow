@@ -65,8 +65,6 @@ def bilinear_sampler(x, v, resize=False, normalize=False, crop=None, out="CONSTA
     vx *= (W / 2)
 
   n, h, w = _get_grid_array(N, H, W, h, w) # [N, H, W, 3]
-  print(n.get_shape())
-  print(h.get_shape())
   vx0 = tf.floor(vx)
   vy0 = tf.floor(vy)
   vx1 = vx0 + 1
@@ -80,9 +78,6 @@ def bilinear_sampler(x, v, resize=False, normalize=False, crop=None, out="CONSTA
   ix1 = tf.clip_by_value(vx1 + w, 0., W_1)
 
   i00 = tf.concat([n, iy0, ix0], 3)
-  print(n.get_shape())
-  print(iy0.get_shape())
-  print(i00.get_shape())
   i01 = tf.concat([n, iy1, ix0], 3)
   i10 = tf.concat([n, iy0, ix1], 3)
   i11 = tf.concat([n, iy1, ix1], 3) # [N, H, W, 3]
@@ -90,10 +85,7 @@ def bilinear_sampler(x, v, resize=False, normalize=False, crop=None, out="CONSTA
   i01 = tf.cast(i01, tf.int32)
   i10 = tf.cast(i10, tf.int32)
   i11 = tf.cast(i11, tf.int32)
-  print(i00.get_shape())
   x00 = tf.gather_nd(x, i00)
-  print(x00.get_shape())
-  print('..')
   x01 = tf.gather_nd(x, i01)
   x10 = tf.gather_nd(x, i10)
   x11 = tf.gather_nd(x, i11)

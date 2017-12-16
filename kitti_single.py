@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 from scipy import misc
 from bilinear_sampler import bilinear_sampler
+import math
 
 class Net(object):
     def initalize(self, sess):
@@ -73,29 +74,33 @@ class Net(object):
         net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 3, 64 , 128, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 128 , 256, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution5'] = self.conv(net_layers['Convolution4'], 3, 256 , 512, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-
-
+        print('last conv')
+        print(net_layers['Convolution1'].get_shape())
+        print(net_layers['Convolution2'].get_shape())
+        print(net_layers['Convolution3'].get_shape())
+        print(net_layers['Convolution4'].get_shape())
+        print(net_layers['Convolution5'].get_shape())
 
         #deconv
-        net_layers['deconv1'] = upscore = self._upscore_layer(net_layers['Convolution5'], shape=tf.shape(bgr),
+        net_layers['deconv1'] = self._upscore_layer(net_layers['Convolution5'], shape=None,
                                            num_classes=512,
                                            debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
 
-        net_layers['deconv2'] = upscore = self._upscore_layer(net_layers['deconv1'], shape=tf.shape(bgr),
+        net_layers['deconv2'] = self._upscore_layer(net_layers['deconv1'], shape=None,
                                            num_classes=256,
                                            debug=debug, name='deconv2', ksize=3, stride=2, pad_input=1)
 
-        net_layers['deconv3'] = upscore = self._upscore_layer(net_layers['deconv2'], shape=tf.shape(bgr),
+        net_layers['deconv3'] = self._upscore_layer(net_layers['deconv2'], shape=None,
                                            num_classes=128,
                                            debug=debug, name='deconv3', ksize=3, stride=2, pad_input=1)
 
-        net_layers['deconv4'] = upscore = self._upscore_layer(net_layers['deconv3'], shape=tf.shape(bgr),
+        net_layers['deconv4'] = self._upscore_layer(net_layers['deconv3'], shape=None,
                                            num_classes=64,
                                            debug=debug, name='deconv4', ksize=3, stride=2, pad_input=1)
-        net_layers['deconv5'] = upscore = self._upscore_layer(net_layers['deconv4'], shape=tf.shape(bgr),
+        net_layers['deconv5'] = self._upscore_layer(net_layers['deconv4'], shape=None,
                                            num_classes=32,
                                            debug=debug, name='deconv5', ksize=3, stride=2, pad_input=1)
-        net_layers['deconv6'] = upscore = self._upscore_layer(net_layers['deconv5'], shape=tf.shape(bgr),
+        net_layers['deconv6'] = self._upscore_layer(net_layers['deconv5'], shape=None,
                                            num_classes=2,
                                            debug=debug, name='deconv6', ksize=3, stride=1, pad_input=1)
 
@@ -110,41 +115,46 @@ class Net(object):
 
     def _upscore_layer(self, bottom, shape,num_classes, name, debug, ksize=3, stride=2, pad_input=1, relu=1):
 
-        if pad_input==1:
-            paddings = tf.constant([ [0, 0], [1, 1,], [1, 1], [0, 0] ])
-            bottom = tf.pad(bottom, paddings, "CONSTANT")
+        #if pad_input==1:
+            #paddings = tf.constant([ [0, 0], [1, 1,], [1, 1], [0, 0] ])
+            #bottom = tf.pad(bottom, paddings, "CONSTANT")
         strides = [1, stride, stride, 1]
         with tf.variable_scope(name):
             in_features = bottom.get_shape()[3].value
-
             if shape is None:
                 # Compute shape out of Bottom
-                in_shape = tf.shape(bottom)
-
-                h = ((in_shape[1] - 1) * stride) + 1
-                w = ((in_shape[2] - 1) * stride) + 1
-                new_shape = [in_shape[0], h, w, num_classes]
+                in_shape = bottom.get_shape()
+                print('in shape')
+                print(in_shape)
+                h = ((in_shape[1].value - 1) * stride) + 1
+                w = ((in_shape[2].value - 1) * stride) + 1
+                new_shape = [in_shape[0].value, h, w, num_classes]
+                print('new shape')
+                print(new_shape)
             else:
                 new_shape = [shape[0], shape[1], shape[2], num_classes]
-            output_shape = tf.stack(new_shape)
 
-            logging.debug("Layer: %s, Fan-in: %d" % (name, in_features))
+
+            deconv_shape = tf.stack([self.batch_size, new_shape[1]+1, new_shape[2]+1, num_classes])
+
+
+            #logging.debug("Layer: %s, Fan-in: %d" % (name, in_features))
             f_shape = [ksize, ksize, num_classes, in_features]
-
             # create
             num_input = ksize * ksize * in_features / stride
             stddev = (2 / num_input)**0.5
 
             ##add padding
-
+            if pad_input==1:
+                paddings = tf.constant([ [0, 0], [1, 1,], [1, 1], [0, 0] ])
+                #bottom = tf.pad(bottom, paddings, "CONSTANT")
             weights = self.get_deconv_filter(f_shape)
             if relu==1:
-                deconv = tf.nn.relu(tf.nn.conv2d_transpose(bottom, weights, output_shape,
-                                            strides=strides, padding='VALID'))
+                deconv = tf.nn.relu(tf.nn.conv2d_transpose(bottom, weights, deconv_shape,
+                                            strides=strides, padding='SAME'))
             else:
-                deconv = tf.nn.conv2d_transpose(bottom, weights, output_shape,
-                                            strides=strides, padding='VALID')
-
+                deconv = tf.nn.conv2d_transpose(bottom, weights, deconv_shape,
+                                            strides=strides, padding='SAME')
 
             if debug:
                 deconv = tf.Print(deconv, [tf.shape(deconv)],
@@ -157,7 +167,7 @@ class Net(object):
     def get_deconv_filter(self, f_shape):
         width = f_shape[0]
         height = f_shape[1]
-        f = ceil(width/2.0)
+        f = math.ceil(width/2.0)
         c = (2 * f - 1 - f % 2) / (2.0 * f)
         bilinear = np.zeros([f_shape[0], f_shape[1]])
         for x in range(width):
@@ -173,7 +183,7 @@ class Net(object):
         return tf.get_variable(name="up_filter", initializer=init,
                                shape=weights.shape)
 
-    def reconstruction_loss(real_images, generated_images):
+    def reconstruction_loss(self,real_images, generated_images):
         """
         The reconstruction loss is defined as the sum of the L1 distances
         between the target images and their generated counterparts
@@ -197,6 +207,8 @@ class Net(object):
         ##assign
         ##assert and cast them to same size!!!!
         self.tgts=self.net_layers['predImg']
+        print('.......')
+        print(self.tgts.get_shape())
         with tf.name_scope("loss"):
           self.loss = self.reconstruction_loss(self.tgts, self.tgt_imgs)
 
