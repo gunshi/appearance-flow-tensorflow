@@ -76,7 +76,7 @@ class Net(object):
 
 
         ##input sizes!!
-        net_layers['fc1'] = self.fc(net_layers['Convolution6'],  , 4096, name='fc1', relu = 1)
+        net_layers['fc1'] = self.fc(net_layers['Convolution6'], 8*8*512 , 4096, name='fc1', relu = 1)
         if self.is_train:
             net_layers['fc1'] = tf.nn.dropout(net_layers['fc1'], self.keep_prob)
         

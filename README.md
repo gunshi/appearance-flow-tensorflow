@@ -1,5 +1,20 @@
 Tensorflow Implementation (Work in Progress)
 
+Notes:
+-Fully convolutional (Please see discussion : )
+-Relative Transforms (Please see : )
+
+References:
+-bilinear sampling code integrated from :
+-Deconv layers weights initialised with 
+
+TODO:
+-tweak code for multi-view prediction
+-Integrate code for shapenet training (currently code works for KITTI training)
+
+
+Contributions and suggestions welcome!
+
 Caffe Implementation provided by authors at: [https://github.com/tinghuiz/appearance-flow] (https://github.com/tinghuiz/appearance-flow)
 
 
