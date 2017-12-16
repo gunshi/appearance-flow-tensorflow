@@ -57,19 +57,17 @@ class Net(object):
 
     def model(self):
 
-        ##debug=True?
-
+        debug=True
+        net_layers={}
         #placeholder for a random set of <batch_size> images of fixed size -- 224,224
         self.input_imgs = tf.placeholder(tf.float32, shape = [None, 224, 224, 3], name = "input_imgs")
         self.input_batch_size = tf.shape(self.input_imgs)[0]  # Returns a scalar `tf.Tensor`
-        assert(self.input_batch_size == self.batch_size)
         self.tform = tf.placeholder(tf.float32, shape = [None, 224, 224, 6], name = "tform")
-
         net_layers['input_stack'] = tf.concat([self.input_imgs, self.tform], 3)
 
         #mean is already subtracted in helper.py as part of preprocessing
         # Conv-Layers
-        net_layers={}
+
         net_layers['Convolution1'] = self.conv(net_layers['input_stack'], 3, 9 , 32, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution2'] = self.conv(net_layers['Convolution1'], 3, 32 , 64, name= 'Convolution2', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 3, 64 , 128, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
@@ -183,10 +181,8 @@ class Net(object):
         return tf.reduce_mean(tf.abs(real_images - generated_images))
 
 
-    def __init__(self, layer, batch_size, trainable):
+    def __init__(self, batch_size, trainable):
         self.batch_size = batch_size
-
-        self.layer = layer
         self.trainable = trainable
         self.is_train=tf.placeholder(tf.bool, name="is_train")
         self.keep_prob = tf.placeholder(tf.float32, name="keep_prob")

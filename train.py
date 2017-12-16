@@ -43,7 +43,7 @@ tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
 tf.flags.DEFINE_integer("batches_train", 3000 , "batches for train")
 tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
-
+tf.flags.DEFINE_boolean("conv_net_training", False, "Training ConvNet (Default: False)")
 
 
 FLAGS = tf.flags.FLAGS
@@ -87,7 +87,6 @@ with tf.Graph().as_default():
     with sess.as_default():
 
         convModel = Net(
-         FLAGS.conv_layer,
          FLAGS.batch_size,
          FLAGS.conv_net_training)
 
