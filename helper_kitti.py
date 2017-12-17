@@ -45,7 +45,7 @@ class InputHelper(object):
 
     def getKittiBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch,  get_img_tforms=1):
         lenseq=len(seq_list)
-        seq_idx=np.random.randint(0,lenseq+1)
+        seq_idx=np.random.randint(0,lenseq)
         seq_num=seq_list[seq_idx]
         labels=[]
         imgpaths_src=[]
@@ -60,7 +60,6 @@ class InputHelper(object):
             radius_num=np.random.randint(1,sample_range+1) #index check for image naming
             odom_src=odomlist[src_img_num]
             odom_src=np.reshape(odom_src,(3,4))
-            print(odom_src)
             if random()>0.5:
                 if (src_img_num-radius_num)>0:
                     tgt_img_num=src_img_num-radius_num
@@ -83,15 +82,10 @@ class InputHelper(object):
             ##convert this to euler
             rel_tform_rot=rel_odom_src_tgt[0:3,0:3]
             rx,ry,rz = euler_from_matrix(rel_tform_rot)
-            rel_tform_vec = [ rel_odom_src_tgt[0,4], rel_odom_src_tgt[1,4], rel_odom_src_tgt[2,4], rx, ry, rz]
-
-            rel_tform_vec=rel_odom_src_tgt[0:3,:]
-            rel_tform_vec=rel_tform_vec.flatten()
-            heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0],1))
-            widthwise = np.tile(heightwise,(1,conv_model_spec[1][1]))
-            print(widthwise.shape)
+            rel_tform_vec = [ rel_odom_src_tgt[0,3], rel_odom_src_tgt[1,3], rel_odom_src_tgt[2,3], rx, ry, rz]
+            heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0]*conv_model_spec[1][1],1))
+            widthwise = np.reshape(heightwise, (conv_model_spec[1][0],conv_model_spec[1][1],-1))
             tforms_imgs.append(widthwise)
-            tforms.append(rel_tform_vec)
 
             src_img_path=seq_path+ 'image_2/' +'%06d.png' % (src_img_num,)
             tgt_img_path=seq_path+ 'image_2/' +'%06d.png' % (tgt_img_num,)
@@ -100,12 +94,7 @@ class InputHelper(object):
 
         imgslist = self.load_preprocess_images_kitti(imgpaths_src,imgpaths_tgt,conv_model_spec,epoch) #return src, tgt
 
-        if get_img_tforms==1:
-
-            return imgslist[0],imgslist[1],tforms_imgs
-
-        else:
-            return imgslist[0],imgslist[1],tforms
+        return imgslist[0],imgslist[1],tforms_imgs
 
 
 

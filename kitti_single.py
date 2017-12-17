@@ -74,12 +74,6 @@ class Net(object):
         net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 3, 64 , 128, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 128 , 256, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution5'] = self.conv(net_layers['Convolution4'], 3, 256 , 512, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        print('last conv')
-        print(net_layers['Convolution1'].get_shape())
-        print(net_layers['Convolution2'].get_shape())
-        print(net_layers['Convolution3'].get_shape())
-        print(net_layers['Convolution4'].get_shape())
-        print(net_layers['Convolution5'].get_shape())
 
         #deconv
         net_layers['deconv1'] = self._upscore_layer(net_layers['Convolution5'], shape=None,
@@ -115,22 +109,15 @@ class Net(object):
 
     def _upscore_layer(self, bottom, shape,num_classes, name, debug, ksize=3, stride=2, pad_input=1, relu=1):
 
-        #if pad_input==1:
-            #paddings = tf.constant([ [0, 0], [1, 1,], [1, 1], [0, 0] ])
-            #bottom = tf.pad(bottom, paddings, "CONSTANT")
         strides = [1, stride, stride, 1]
         with tf.variable_scope(name):
             in_features = bottom.get_shape()[3].value
             if shape is None:
                 # Compute shape out of Bottom
                 in_shape = bottom.get_shape()
-                print('in shape')
-                print(in_shape)
                 h = ((in_shape[1].value - 1) * stride) + 1
                 w = ((in_shape[2].value - 1) * stride) + 1
                 new_shape = [in_shape[0].value, h, w, num_classes]
-                print('new shape')
-                print(new_shape)
             else:
                 new_shape = [shape[0], shape[1], shape[2], num_classes]
 

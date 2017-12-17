@@ -11,7 +11,7 @@ from helper_kitti import InputHelper, save_plot
 import gzip
 from random import random
 from kitti_single import Net
-
+from scipy.misc import imsave
 # Parameters
 # ==================================================
 
@@ -43,7 +43,7 @@ tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
 tf.flags.DEFINE_integer("batches_train", 3000 , "batches for train")
 tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
-tf.flags.DEFINE_boolean("conv_net_training", False, "Training ConvNet (Default: False)")
+tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
 
 
 FLAGS = tf.flags.FLAGS
@@ -107,7 +107,6 @@ with tf.Graph().as_default():
             sparsity_summary = tf.summary.scalar("{}/grad/sparsity".format(v.name), tf.nn.zero_fraction(g))
             grad_summaries.append(grad_hist_summary)
             grad_summaries.append(sparsity_summary)
-    #grad_summaries_merged = tf.summary.merge(grad_summaries)
     summaries_merged = tf.summary.merge_all()
     print("defined gradient summaries")
     # Output directory for models and summaries
@@ -147,7 +146,7 @@ with tf.Graph().as_default():
     train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/train', graph=tf.get_default_graph())
     val_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/val' , graph=tf.get_default_graph())
 
-    def train_step(x1_batch, x2_batch, tform_batch):
+    def train_step(x1_batch, x2_batch, tform_batch, train_iter, epoch):
 
         #A single training step
 
@@ -155,15 +154,20 @@ with tf.Graph().as_default():
                     convModel.tgt_imgs: x2_batch,
                     convModel.tform: tform_batch }
 
-
-        outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
+        if(train_iter%1000==0):
+            outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
+            img_num=0
+            for img_out in outputs:
+                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png',img_out)
+                img_num+=1
+        else:
+             _, step, loss, summary = sess.run([tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
         time_str = datetime.datetime.now().isoformat()
-
         return summary, loss
 
     def dev_step(x1_batch, x2_batch, tform_batch, dev_iter, epoch):
 
-        #A single training step
+        #A single validation step
 
         feed_dict={convModel.input_imgs: x1_batch,
                     convModel.tgt_imgs: x2_batch,
@@ -193,26 +197,21 @@ with tf.Graph().as_default():
             x1_batch, x2_batch, y_batch = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,True, imgs_counts, convModel.spec,nn)
             if len(y_batch)<1:
                 continue
-            summary, train_batch_loss =train_step(x1_batch, x2_batch, y_batch)
+            summary, train_batch_loss =train_step(x1_batch, x2_batch, y_batch, kk, nn)
             train_writer.add_summary(summary, current_step)
             train_epoch_loss = train_epoch_loss + train_batch_loss* len(y_batch)
             train_batch_loss_arr.append(train_batch_loss*len(y_batch))
         print("train_loss ={}".format(train_epoch_loss/len(train_set[2])))
         train_loss.append(train_epoch_loss/len(train_set[2]))
 
-
-
         # Evaluate on Validataion Data for every epoch
         val_epoch_loss=0.0
         print("\nEvaluation:")
 
-        dev_iter=0
-
         for kk in range(FLAGS.batches_test):
             x1_dev_b, x2_dev_b, y_dev_b = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstest,True, imgs_counts, convModel.spec,nn)
 
-            dev_iter += 1
-            summary,  val_batch_loss = dev_step(x1_dev_b, x2_dev_b, y_dev_b,  dev_iter,nn)
+            summary,  val_batch_loss = dev_step(x1_dev_b, x2_dev_b, y_dev_b, kk ,nn)
 
             val_writer.add_summary(summary, current_step)
             val_epoch_loss = val_epoch_loss + val_batch_loss*len(y_dev_b)
