@@ -41,7 +41,7 @@ tf.flags.DEFINE_string("summaries_dir", "./../summaries/", "Summary storage")
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
-tf.flags.DEFINE_integer("batches_train", 3000 , "batches for train")
+tf.flags.DEFINE_integer("batches_train", 6000 , "batches for train")
 tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
 
@@ -119,9 +119,10 @@ with tf.Graph().as_default():
     checkpoint_prefix = os.path.join(checkpoint_dir, "model")
     if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-
-
-
+    current_path = os.getcwd()
+    imgdir_path=os.path.join(current_path,'imgs')
+    if not os.path.exists(imgdir_path):
+        os.makedirs(imgdir_path)
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
 
     # Initialize all variables
@@ -154,11 +155,13 @@ with tf.Graph().as_default():
                     convModel.tgt_imgs: x2_batch,
                     convModel.tform: tform_batch }
 
-        if(train_iter%1000==0):
+        if(train_iter%2000==0):
             outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
-            for img_out in outputs:
-                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png',img_out)
+            for i in range(len(outputs)):
+                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
+                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_input.png', x1_batch[i])
+                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', x2_batch[i])
                 img_num+=1
         else:
              _, step, loss, summary = sess.run([tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
@@ -194,6 +197,7 @@ with tf.Graph().as_default():
         epoch_start_time = time.time()
         train_epoch_loss=0.0
         for kk in range(FLAGS.batches_train):
+            print(str(kk))
             x1_batch, x2_batch, y_batch = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,True, imgs_counts, convModel.spec,nn)
             if len(y_batch)<1:
                 continue
@@ -201,8 +205,8 @@ with tf.Graph().as_default():
             train_writer.add_summary(summary, current_step)
             train_epoch_loss = train_epoch_loss + train_batch_loss* len(y_batch)
             train_batch_loss_arr.append(train_batch_loss*len(y_batch))
-        print("train_loss ={}".format(train_epoch_loss/len(train_set[2])))
-        train_loss.append(train_epoch_loss/len(train_set[2]))
+        print("train_loss ={}".format(train_epoch_loss/(FLAGS.batches_train*FLAGS.batch_size)))
+        train_loss.append(train_epoch_loss/(FLAGS.batches_train*FLAGS.batch_size))
 
         # Evaluate on Validataion Data for every epoch
         val_epoch_loss=0.0
