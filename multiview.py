@@ -108,7 +108,7 @@ class Net(object):
         net_layers['flow'] = tf.slice( net_layers['rs'], [0,0,0,0] , [self.batch_size,224,224,2] )
         net_layers['conf'] = tf.slice( net_layers['rs'], [0,0,0,2] , [self.batch_size,224,224,1] )
 
-        net_layers['predImg']=bilinear_sampler(self.input_imgs,net_layers['flow'], resize=True)
+        net_layers['predImg_single']=bilinear_sampler(self.input_imgs,net_layers['flow'], resize=True)
 
 
 
@@ -146,8 +146,19 @@ class Net(object):
 
         net_layers['flow_aux'] = tf.slice( net_layers['rs_aux'], [0,0,0,0] , [self.batch_size,224,224,2] )
         net_layers['conf_aux'] = tf.slice( net_layers['rs_aux'], [0,0,0,2] , [self.batch_size,224,224,1] )
-        net_layers['predImg_aux'] = bilinear_sampler(self.input_imgs,net_layers['flow_aux'], resize=True)
+        net_layers['predImg_single_aux'] = bilinear_sampler(self.input_imgs,net_layers['flow_aux'], resize=True)
 
+
+        net_layers['concat_conf'] = tf.concat([net_layers['conf'], net_layers['conf_aux']], 3)
+        net_layers['concat_soft'] = tf.nn.softmax(net_layers['concat_conf'])
+        net_layers['srcSelect'] = tf.slice(net_layers['concat_soft'], [0,0,0,0] , [self.batch_size,224,224,1])
+        net_layers['auxSelect'] = tf.slice(net_layers['concat_soft'], [0,0,0,1] , [self.batch_size,224,224,1])
+        net_layers['concat_pixelwise_src'] = tf.concat([net_layers['srcSelect'], net_layers['srcSelect'], net_layers['srcSelect']], 3)
+        net_layers['concat_pixelwise_aux'] = tf.concat([net_layers['auxSelect'], net_layers['auxSelect'], net_layers['auxSelect']], 3)
+        net_layers['srcSelectImg'] = tf.multiply(net_layers['predImg_single'],net_layers['concat_pixelwise_src'])
+        net_layers['auxSelectImg'] = tf.multiply(net_layers['predImg_single_aux'], net_layers['concat_pixelwise_aux'])
+        
+        net_layers['predImg'] = tf.add(net_layers['srcSelectImg'], net_layers['auxSelectImg'], name='predImg')
 
 
         self.net_layers = net_layers
