@@ -19,7 +19,7 @@ https://github.com/iwyoo/tf-bilinear_sampler
 popular FCN archiecture implementations
 
 TODO:
--tweak code for multi-view prediction
+
 -Integrate code for shapenet training (currently code works for KITTI training)
 
 
