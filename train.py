@@ -117,7 +117,7 @@ with tf.Graph().as_default():
     print("defined gradient summaries")
     # Output directory for models and summaries
     timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join("./../", "runs", timestamp))
+    out_dir = os.path.abspath(os.path.join("./../", "runs", FLAGS.name))
     print("Writing to {}\n".format(out_dir))
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
@@ -160,7 +160,7 @@ with tf.Graph().as_default():
 
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.aux_imgs: src_batch[1],
-                        convModel.tgt_imgs: x2_batch,
+                        convModel.tgt_imgs: tgt_batch,
                         convModel.tform: tform_batch[0],
                         convModel.tform_aux: tform_batch[1] }
 
@@ -176,6 +176,7 @@ with tf.Graph().as_default():
             img_num=0
             for i in range(len(outputs)):
                 imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
+                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
                 for j in range(len(src_batch)):
                     imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
                 img_num+=1
@@ -192,7 +193,7 @@ with tf.Graph().as_default():
 
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.aux_imgs: src_batch[1],
-                        convModel.tgt_imgs: x2_batch,
+                        convModel.tgt_imgs: tgt_batch,
                         convModel.tform: tform_batch[0],
                         convModel.tform_aux: tform_batch[1] }
 
@@ -246,8 +247,8 @@ with tf.Graph().as_default():
             val_writer.add_summary(summary, current_step)
             val_epoch_loss = val_epoch_loss + val_batch_loss*len(tform_dev_b)
             val_batch_loss_arr.append(val_batch_loss*len(tform_dev_b))
-        print("val_loss ={}".format(val_epoch_loss/len(dev_set[2])))
-        val_loss.append(val_epoch_loss/len(dev_set[2]))
+            print("val_loss ={}".format(val_epoch_loss/FLAGS.batch_size*FLAGS.batches_test))
+        val_loss.append(val_epoch_loss/FLAGS.batch_size*FLAGS.batches_test)
 
 
 
