@@ -161,14 +161,14 @@ with tf.Graph().as_default():
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.aux_imgs: src_batch[1],
                         convModel.tgt_imgs: x2_batch,
-                        convModel.tform: tform_batch[0], 
+                        convModel.tform: tform_batch[0],
                         convModel.tform_aux: tform_batch[1] }
 
         else:
 
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.tgt_imgs: tgt_batch,
-                        convModel.tform: tform_batch }
+                        convModel.tform: tform_batch[0] }
 
 
         if(train_iter%2000==0):
@@ -193,7 +193,8 @@ with tf.Graph().as_default():
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.aux_imgs: src_batch[1],
                         convModel.tgt_imgs: x2_batch,
-                        convModel.tform: tform_batch }
+                        convModel.tform: tform_batch[0],
+                        convModel.tform_aux: tform_batch[1] }
 
         else:
 

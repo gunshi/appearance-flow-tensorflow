@@ -37,7 +37,7 @@ class InputHelper(object):
         for seq in seq_list:
             append_seqname="%02d.txt" % (seq,)
             odom_list=[]
-            for line in open(self.kitti_odompath+append_seqname): 
+            for line in open(self.kitti_odompath+append_seqname):
                 val=line.split()
                 val=[float(ele) for ele in val]
                 odom_list.append(val)
@@ -51,11 +51,12 @@ class InputHelper(object):
         imgpaths_tgt=[]
         tforms_imgs=[]
 
+        seq_path = self.kitti_parentpath+"%02d/" % (seq_num,)
         odomlist=self.odomDict[seq_num]
 
         for x in range(batch_size):
             src_img_num=np.random.randint(0,seq_imgs_num)
-            radius_num=np.random.randint(1,sample_range+1) 
+            radius_num=np.random.randint(1,sample_range+1)
             odom_src=odomlist[src_img_num]
             odom_src=np.reshape(odom_src,(3,4))
             if random()>0.5:
@@ -98,13 +99,14 @@ class InputHelper(object):
         imgpaths_tgt=[]
         tforms_imgs=[[] for i in range(2)]
 
+        seq_path = self.kitti_parentpath+"%02d/" % (seq_num,)
         odomlist=self.odomDict[seq_num]
 
         for x in range(batch_size):
 
             src_img_num = np.random.randint(0,seq_imgs_num)
-            radius_num_a = np.random.randint(1,int(sample_range/2)+1) 
-            radius_num_b = np.random.randint(1,int(sample_range/2)+1) 
+            radius_num_a = np.random.randint(1,int(sample_range/2)+1)
+            radius_num_b = np.random.randint(1,int(sample_range/2)+1)
             odom_src = odomlist[src_img_num]
             odom_src = np.reshape(odom_src,(3,4))
 
@@ -174,7 +176,6 @@ class InputHelper(object):
         lenseq = len(seq_list)
         seq_idx = np.random.randint(0,lenseq)
         seq_num = seq_list[seq_idx]
-        seq_path = self.kitti_parentpath+"%02d/" % (seq_num,)
         seq_imgs_num = img_num_dict[seq_num]
         src_imgslist = []
 
