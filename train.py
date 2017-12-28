@@ -11,6 +11,7 @@ from helper_kitti import InputHelper, save_plot
 import gzip
 from random import random
 from kitti_single import Net
+from kitti_multi import Net_MultiView
 from scipy.misc import imsave
 # Parameters
 # ==================================================
@@ -44,7 +45,7 @@ tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
 tf.flags.DEFINE_integer("batches_train", 6000 , "batches for train")
 tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
-
+tf.flags.DEFINE_boolean("multi_view_training", False, "Training ConvNet (Default: False)")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -61,7 +62,7 @@ if FLAGS.kitti_parentpath==None:
     print("Input Files List is empty. use --training_file_path argument.")
     exit()
 
-seqs=[i for i in range(0,FLAGS.numseqs) ] ##can choose spcific seqs also instead of this
+seqs=[ i for i in range(0,FLAGS.numseqs) ]
 #break into train and test
 seqstrain=seqs[0:10]
 seqstest=seqs[10:]
@@ -85,10 +86,15 @@ with tf.Graph().as_default():
     sess = tf.Session(config=session_conf)
     print("started session")
     with sess.as_default():
+        if(FLAGS.multi_view_training):
+            convModel = Net_MultiView(
+                 FLAGS.batch_size,
+                 FLAGS.conv_net_training)
+        else:
 
-        convModel = Net(
-         FLAGS.batch_size,
-         FLAGS.conv_net_training)
+            convModel = Net(
+             FLAGS.batch_size,
+             FLAGS.conv_net_training)
 
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
@@ -147,34 +153,53 @@ with tf.Graph().as_default():
     train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/train', graph=tf.get_default_graph())
     val_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/val' , graph=tf.get_default_graph())
 
-    def train_step(x1_batch, x2_batch, tform_batch, train_iter, epoch):
+    def train_step(src_batch, tgt_batch, tform_batch, train_iter, epoch, multi_view_training):
 
         #A single training step
+        if(FLAGS.multi_view_training):
 
-        feed_dict={convModel.input_imgs: x1_batch,
-                    convModel.tgt_imgs: x2_batch,
-                    convModel.tform: tform_batch }
+            feed_dict={convModel.input_imgs: src_batch[0],
+                        convModel.aux_imgs: src_batch[1],
+                        convModel.tgt_imgs: x2_batch,
+                        convModel.tform: tform_batch[0], 
+                        convModel.tform_aux: tform_batch[1] }
+
+        else:
+
+            feed_dict={convModel.input_imgs: src_batch[0],
+                        convModel.tgt_imgs: tgt_batch,
+                        convModel.tform: tform_batch }
+
 
         if(train_iter%2000==0):
             outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
             for i in range(len(outputs)):
                 imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
-                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_input.png', x1_batch[i])
-                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', x2_batch[i])
+                for j in range(len(src_batch)):
+                    imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
                 img_num+=1
         else:
              _, step, loss, summary = sess.run([tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
         time_str = datetime.datetime.now().isoformat()
         return summary, loss
 
-    def dev_step(x1_batch, x2_batch, tform_batch, dev_iter, epoch):
+    def dev_step(src_batch, tgt_batch, tform_batch, dev_iter, epoch, multi_view_training):
 
         #A single validation step
 
-        feed_dict={convModel.input_imgs: x1_batch,
-                    convModel.tgt_imgs: x2_batch,
-                    convModel.tform: tform_batch }
+        if(FLAGS.multi_view_training):
+
+            feed_dict={convModel.input_imgs: src_batch[0],
+                        convModel.aux_imgs: src_batch[1],
+                        convModel.tgt_imgs: x2_batch,
+                        convModel.tform: tform_batch }
+
+        else:
+
+            feed_dict={convModel.input_imgs: src_batch[0],
+                        convModel.tgt_imgs: tgt_batch,
+                        convModel.tform: tform_batch[0] }
 
 
 
@@ -198,13 +223,13 @@ with tf.Graph().as_default():
         train_epoch_loss=0.0
         for kk in range(FLAGS.batches_train):
             print(str(kk))
-            x1_batch, x2_batch, y_batch = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,True, imgs_counts, convModel.spec,nn)
-            if len(y_batch)<1:
+            src_batch, tgt_batch, tform_batch = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,True, imgs_counts, convModel.spec,nn, FLAGS.multi_view_training)
+            if len(tform_batch)<1:
                 continue
-            summary, train_batch_loss =train_step(x1_batch, x2_batch, y_batch, kk, nn)
+            summary, train_batch_loss =train_step(src_batch, tgt_batch, tform_batch, kk, nn, FLAGS.multi_view_training)
             train_writer.add_summary(summary, current_step)
-            train_epoch_loss = train_epoch_loss + train_batch_loss* len(y_batch)
-            train_batch_loss_arr.append(train_batch_loss*len(y_batch))
+            train_epoch_loss = train_epoch_loss + train_batch_loss* len(tform_batch)
+            train_batch_loss_arr.append(train_batch_loss*len(tform_batch))
         print("train_loss ={}".format(train_epoch_loss/(FLAGS.batches_train*FLAGS.batch_size)))
         train_loss.append(train_epoch_loss/(FLAGS.batches_train*FLAGS.batch_size))
 
@@ -213,13 +238,13 @@ with tf.Graph().as_default():
         print("\nEvaluation:")
 
         for kk in range(FLAGS.batches_test):
-            x1_dev_b, x2_dev_b, y_dev_b = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstest,True, imgs_counts, convModel.spec,nn)
+            src_dev_b, tgt_dev_b, tform_dev_b = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstest,True, imgs_counts, convModel.spec, nn, FLAGS.multi_view_training)
 
-            summary,  val_batch_loss = dev_step(x1_dev_b, x2_dev_b, y_dev_b, kk ,nn)
+            summary,  val_batch_loss = dev_step(src_dev_b, tgt_dev_b, tform_dev_b, kk ,nn, FLAGS.multi_view_training)
 
             val_writer.add_summary(summary, current_step)
-            val_epoch_loss = val_epoch_loss + val_batch_loss*len(y_dev_b)
-            val_batch_loss_arr.append(val_batch_loss*len(y_dev_b))
+            val_epoch_loss = val_epoch_loss + val_batch_loss*len(tform_dev_b)
+            val_batch_loss_arr.append(val_batch_loss*len(tform_dev_b))
         print("val_loss ={}".format(val_epoch_loss/len(dev_set[2])))
         val_loss.append(val_epoch_loss/len(dev_set[2]))
 

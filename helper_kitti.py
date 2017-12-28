@@ -37,27 +37,25 @@ class InputHelper(object):
         for seq in seq_list:
             append_seqname="%02d.txt" % (seq,)
             odom_list=[]
-            for line in open(self.kitti_odompath+append_seqname): ##+'/'    ???
+            for line in open(self.kitti_odompath+append_seqname): 
                 val=line.split()
                 val=[float(ele) for ele in val]
                 odom_list.append(val)
             self.odomDict[seq]=odom_list
 
-    def getKittiBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch,  get_img_tforms=1):
-        lenseq=len(seq_list)
-        seq_idx=np.random.randint(0,lenseq)
-        seq_num=seq_list[seq_idx]
-        labels=[]
+
+
+    def get_singlevw_info(self, batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec ):
+
         imgpaths_src=[]
         imgpaths_tgt=[]
-        seq_path=self.kitti_parentpath+"%02d/" % (seq_num,)
-        tforms=[]
         tforms_imgs=[]
-        seq_imgs_num=img_num_dict[seq_num]
+
         odomlist=self.odomDict[seq_num]
+
         for x in range(batch_size):
-            src_img_num=np.random.randint(0,seq_imgs_num) #index check
-            radius_num=np.random.randint(1,sample_range+1) #index check for image naming
+            src_img_num=np.random.randint(0,seq_imgs_num)
+            radius_num=np.random.randint(1,sample_range+1) 
             odom_src=odomlist[src_img_num]
             odom_src=np.reshape(odom_src,(3,4))
             if random()>0.5:
@@ -77,9 +75,9 @@ class InputHelper(object):
             odom_tgt_4x4 = np.vstack([odom_tgt, newrow])
             odom_src_4x4 = np.vstack([odom_src, newrow])
             odom_src_inv=linalg.inv(odom_src_4x4)
-            #src inv into tgt - relative transform
+            #src inv * tgt = relative transform
             rel_odom_src_tgt=np.matmul(odom_src_inv,odom_tgt_4x4)
-            ##convert this to euler
+            ##converting to euler to get 6d =(3+3) dimensional vector for pose
             rel_tform_rot=rel_odom_src_tgt[0:3,0:3]
             rx,ry,rz = euler_from_matrix(rel_tform_rot)
             rel_tform_vec = [ rel_odom_src_tgt[0,3], rel_odom_src_tgt[1,3], rel_odom_src_tgt[2,3], rx, ry, rz]
@@ -92,28 +90,120 @@ class InputHelper(object):
             imgpaths_src.append(src_img_path)
             imgpaths_tgt.append(tgt_img_path)
 
-        imgslist = self.load_preprocess_images_kitti(imgpaths_src,imgpaths_tgt,conv_model_spec,epoch) #return src, tgt
+        return [imgpaths_src], [tforms_imgs], imgpaths_tgt
 
-        return imgslist[0],imgslist[1],tforms_imgs
+    def get_multivw_info(self, batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec ):
+
+        imgpaths_src=[[] for i in range(2)]
+        imgpaths_tgt=[]
+        tforms_imgs=[[] for i in range(2)]
+
+        odomlist=self.odomDict[seq_num]
+
+        for x in range(batch_size):
+
+            src_img_num = np.random.randint(0,seq_imgs_num)
+            radius_num_a = np.random.randint(1,int(sample_range/2)+1) 
+            radius_num_b = np.random.randint(1,int(sample_range/2)+1) 
+            odom_src = odomlist[src_img_num]
+            odom_src = np.reshape(odom_src,(3,4))
+
+            if random()>0.5:
+                if (src_img_num - sample_range) > 2:
+                    tgt_img_num = src_img_num - radius_num_a
+                    aux_img_num = tgt_img_num - radius_num_b
+                else:
+                    tgt_img_num = src_img_num + radius_num_a
+                    aux_img_num = tgt_img_num + radius_num_b
+
+
+            else:
+                if (src_img_num + sample_range ) < seq_imgs_num - 3:
+                    tgt_img_num = src_img_num + radius_num_a
+                    aux_img_num = tgt_img_num + radius_num_b
+
+                else:
+                    tgt_img_num = src_img_num - radius_num_a
+                    aux_img_num = tgt_img_num - radius_num_b
+
+
+            odom_tgt=odomlist[tgt_img_num]
+            odom_tgt=np.reshape(odom_tgt,(3,4))
+
+            odom_aux=odomlist[aux_img_num]
+            odom_aux=np.reshape(odom_aux,(3,4))
+
+            newrow = [0,0,0,1]
+            odom_tgt_4x4 = np.vstack([odom_tgt, newrow])
+            odom_src_4x4 = np.vstack([odom_src, newrow])
+            odom_aux_4x4 = np.vstack([odom_aux, newrow])
+
+            src_matrices = []
+            src_matrices.append(odom_src_4x4)
+            src_matrices.append(odom_aux_4x4)
+
+            for mat in src_matrices:
+
+                odom_src_inv=linalg.inv(mat)
+                #src inv * tgt = relative transform
+                rel_odom_src_tgt=np.matmul(odom_src_inv,odom_tgt_4x4)
+                ##converting to euler to get 6d =(3+3) dimensional vector for pose
+                rel_tform_rot = rel_odom_src_tgt[0:3,0:3]
+                rx,ry,rz = euler_from_matrix(rel_tform_rot)
+                rel_tform_vec = [ rel_odom_src_tgt[0,3], rel_odom_src_tgt[1,3], rel_odom_src_tgt[2,3], rx, ry, rz]
+                heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0]*conv_model_spec[1][1],1))
+                widthwise = np.reshape(heightwise, (conv_model_spec[1][0],conv_model_spec[1][1],-1))
+                tforms_imgs[src_matrices.index(mat)].append(widthwise)
+
+            src_img_path=seq_path+ 'image_2/' +'%06d.png' % (src_img_num,)
+            aux_img_path=seq_path+ 'image_2/' +'%06d.png' % (aux_img_num,)
+            tgt_img_path=seq_path+ 'image_2/' +'%06d.png' % (tgt_img_num,)
+            imgpaths_src[0].append(src_img_path)
+            imgpaths_src[1].append(aux_img_path)
+            imgpaths_tgt.append(tgt_img_path)
+
+        return imgpaths_src, tforms_imgs, imgpaths_tgt
 
 
 
-    def load_preprocess_images_kitti(self, source_paths, target_paths, conv_model_spec, epoch, is_train=True):
-        batch1_seq, batch2_seq = [], []
+
+    def getKittiBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch,  get_img_tforms=1, is_multi_view=False):
+
+
+
+        lenseq = len(seq_list)
+        seq_idx = np.random.randint(0,lenseq)
+        seq_num = seq_list[seq_idx]
+        seq_path = self.kitti_parentpath+"%02d/" % (seq_num,)
+        seq_imgs_num = img_num_dict[seq_num]
+        src_imgslist = []
+
+        if(is_multi_view):
+            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_multivw_info( batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec)
+        else:
+            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_singlevw_info( batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec)
+
+        for srclists in imgpaths_src:
+            src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch))
+
+        tgt_imgslist = self.load_preprocess_images_kitti(imgpaths_tgt, conv_model_spec,epoch)
+
+        return src_imgslist,tgt_imgslist,tforms_imgs
+
+
+
+    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch, is_train=True):
+        img_batch = []
         crop_window=np.random.randint(0,3)
 
-        for src_path,tgt_path in zip(source_paths, target_paths):
-            img_org = misc.imread(src_path)
+        for img_path in img_paths:
+            img_org = misc.imread(img_path)
             img_normalized = self.normalize_input(img_org, conv_model_spec,crop_window)
-            batch1_seq.append(img_normalized)
-
-            img_org = misc.imread(tgt_path)
-            img_normalized = self.normalize_input(img_org, conv_model_spec,crop_window)
-            batch2_seq.append(img_normalized)
+            img_batch.append(img_normalized)
 
         #misc.imsave('temp1.png', np.vstack([np.hstack(batch1_seq),np.hstack(batch2_seq)]))
 
-        temp =  [np.asarray(batch1_seq), np.asarray(batch2_seq)]
+        temp =  np.asarray(img_batch)
         return temp
 
 
