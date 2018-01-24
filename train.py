@@ -27,7 +27,7 @@ tf.flags.DEFINE_string("name", "result", "prefix names of the output files(defau
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 30, "Batch Size (default: 10)")
-tf.flags.DEFINE_integer("sample_range", 10, "Batch Size (default: 10)")
+tf.flags.DEFINE_integer("sample_range", 5, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
 tf.flags.DEFINE_string("loss", "contrastive", "Type of Loss function")
@@ -254,7 +254,6 @@ with tf.Graph().as_default():
 
         # Update stored model
         if current_step % (FLAGS.checkpoint_every) == 0:
-            max_validation_correct = sum_val_correct
             saver.save(sess, checkpoint_prefix, global_step=current_step)
             tf.train.write_graph(sess.graph.as_graph_def(), checkpoint_prefix, "graph"+str(nn)+".pb", as_text=False)
             print("Saved model {} with checkpoint to {}".format(nn, checkpoint_prefix))
@@ -262,8 +261,8 @@ with tf.Graph().as_default():
         epoch_end_time = time.time()
         empty=[]
         print("Total time for {} th-epoch is {}\n".format(nn, epoch_end_time-epoch_start_time))
-        save_plot(train_loss, val_loss,empty,empty, 'epochs', 'loss', 'Loss vs epochs', [-0.1, nn+0.1, 0, np.max(train_loss)+0.2],  ['train','val' ],'./loss_'+str(FLAGS.name))
-        save_plot(train_batch_loss_arr, val_batch_loss_arr,empty,empty, 'steps', 'loss', 'Loss vs steps', [-0.1, (nn+1)*sum_no_of_batches+0.1, 0, np.max(train_batch_loss_arr)+0.2],  ['train','val' ],'./loss_batch_'+str(FLAGS.name))
+        save_plot(train_loss, val_loss, 'epochs', 'loss', 'Loss vs epochs', [-0.1, nn+0.1, 0, np.max(train_loss)+0.2],  ['train','val' ],'./loss_'+str(FLAGS.name))
+        save_plot(train_batch_loss_arr, val_batch_loss, 'steps', 'loss', 'Loss vs steps', [-0.1, (nn+1)*FLAGS.batch_size*FLAGS.batches_test+0.1, 0, np.max(train_batch_loss_arr)+0.2],  ['train','val' ],'./loss_batch_'+str(FLAGS.name))
 
     end_time = time.time()
     print("Total time for {} epochs is {}".format(FLAGS.num_epochs, end_time-start_time))
