@@ -249,19 +249,20 @@ class Net_tvsn(object):
         net_layers['gen_view_conv'] = tf.nn.relu(batch_norm(net_layers['gen_view_conv'], is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope='gen_view_conv'))
 
 
+        net_layers['concat1'] = tf.concat([net_layers['gen_conv_bn6'], net_layers['gen_view_conv'], net_layers['']], 0) ##is this 0 dimension correct?
+        concat2 =  self.conv(self.net_layers['concat1'], 3, 512+512+128, 512, name='', strides=[1,1,1,1] , padding='VALID', groups=1,pad_input=1, relu=0)
+        concat2 = tf.nn.relu(batch_norm(concat2,is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope='concat2' ))
 
 
-        net_layers['view_concat'] = tf.concat([net_layers['fc6'], net_layers['view_fc2']], 0) ##is this 0 dimension correct?
+        concat3 =  self.conv(self.net_layers['concat2'], 3, 512, 512, name='', strides=[1,1,1,1] , padding='VALID', groups=1,pad_input=1, relu=0)
+        concat3 = tf.nn.relu(batch_norm(concat3,is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope='concat3' ))
 
-        net_layers['de_fc1'] = self.fc(net_layers['view_concat'], 2304 , 2048, name='de_fc1', relu = 1)
-        
 
-        self.net_layers['concat3']
-
-        #decoder
+##decoder        
 
 
 
+#convert the whole thing to self.netlayers 
 
     def tvsn_discrim():
         feat1 =  self.conv(self.net_layers['predImg_final'],4,3,64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
