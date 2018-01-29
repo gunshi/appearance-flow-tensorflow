@@ -258,9 +258,12 @@ class Net_tvsn(object):
         concat3 = tf.nn.relu(batch_norm(concat3,is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope='concat3' ))
 
 
-##decoder        
-
-
+##decoder
+        #some concats
+         = tf.nn.conv2d_transpose()
+         = tf.nn.conv2d()
+         = tf.nn.relu(batch_norm( , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+         = tf.concat()
 
 #convert the whole thing to self.netlayers 
 
