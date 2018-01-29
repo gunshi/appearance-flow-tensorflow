@@ -305,9 +305,16 @@ class Net_tvsn(object):
 
 
 
+        deconv6 = tf.nn.conv2d_transpose(deconv5, 16, 4, stride=2, padding='SAME') ##??
+        deconv6 = tf.nn.relu(batch_norm(deconv6 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        net_layers['skip_deconv6'] = tf.concat([deconv6, self.input_imgs], 3) ##is this 0 dimension correct?
+
+        deconv6 = tf.nn.conv2d(skip_deconv6, 3, 16+3, 16, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
+        deconv6 = tf.nn.relu(batch_norm(deconv6, is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
 
 
-         = tf.concat()
+#tanh
+#conv
 
 #convert the whole thing to self.netlayers 
 
