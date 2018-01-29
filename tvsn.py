@@ -65,13 +65,6 @@ class Net_tvsn(object):
         return tf.nn.max_pool(input_, ksize=[1,3,3,1], strides=[1,2,2,1], padding=padding, name= name)
 
 
-#add explainability~~
-#complete generator//
-#add discrim//
-#add semantic seg
-#add vgg, resnet, alexnet
-
-
     def doafn():
         debug = True
         net_layers = {}
@@ -216,26 +209,25 @@ class Net_tvsn(object):
     def tvsn_gen():
 
     #check padding!!!!
-    ##check what reuse for batch norm means!!!!
-
+    
         #encoder
         gen_conv1 =  self.conv(self.net_layers['predImg'],4,3,16,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn1 = tf.nn.leaky_relu(batch_norm(gen_conv1,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='gen_conv1'))
+        gen_conv_bn1 = tf.nn.leaky_relu(batch_norm(gen_conv1,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv1'))
         
         gen_conv2 =  self.conv(gen_conv_bn1,4,16,32,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn2 = tf.nn.leaky_relu(batch_norm(gen_conv2,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='gen_conv2'))
+        gen_conv_bn2 = tf.nn.leaky_relu(batch_norm(gen_conv2,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv2'))
         
         gen_conv3 =  self.conv(gen_conv_bn2, 4, 32, 64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn3 = tf.nn.leaky_relu(batch_norm(gen_conv3,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='gen_conv3'))
+        gen_conv_bn3 = tf.nn.leaky_relu(batch_norm(gen_conv3,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv3'))
         
         gen_conv4 =  self.conv(gen_conv_bn3, 4, 64, 128,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn4 = tf.nn.leaky_relu(batch_norm(gen_conv4,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='gen_conv4'))
+        gen_conv_bn4 = tf.nn.leaky_relu(batch_norm(gen_conv4,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv4'))
         
         gen_conv5 =  self.conv(gen_conv_bn4, 4, 128, 256,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn5 = tf.nn.leaky_relu(batch_norm(gen_conv5,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='gen_conv5'))
+        gen_conv_bn5 = tf.nn.leaky_relu(batch_norm(gen_conv5,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv5'))
              
         gen_conv6 =  self.conv(gen_conv_bn5, 4, 256, 512,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn6 = tf.nn.leaky_relu(batch_norm(gen_conv6,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='gen_conv6'))
+        gen_conv_bn6 = tf.nn.leaky_relu(batch_norm(gen_conv6,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv6'))
         
 
         #bottleneck
@@ -246,71 +238,73 @@ class Net_tvsn(object):
 
         net_layers['gen_view_conv'] = tf.contrib.layers.conv2d_transpose(net_layers['gen_view_fc2'],128,4) 
 
-        net_layers['gen_view_conv'] = tf.nn.relu(batch_norm(net_layers['gen_view_conv'], is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope='gen_view_conv'))
+        net_layers['gen_view_conv'] = tf.nn.relu(batch_norm(net_layers['gen_view_conv'], is_training=phase, updates_collections=None,zero_debias_moving_mean=True, scope='gen_view_conv'))
 
 
         net_layers['concat1'] = tf.concat([net_layers['gen_conv_bn6'], net_layers['gen_view_conv'], net_layers['']], 3) ##is this 0 dimension correct?
         concat2 =  self.conv(self.net_layers['concat1'], 3, 512+512+128, 512, name='', strides=[1,1,1,1] , padding='VALID', groups=1,pad_input=1, relu=0)
-        concat2 = tf.nn.relu(batch_norm(concat2,is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope='concat2' ))
+        concat2 = tf.nn.relu(batch_norm(concat2,is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope='concat2' ))
 
 
         concat3 =  self.conv(self.net_layers['concat2'], 3, 512, 512, name='', strides=[1,1,1,1] , padding='VALID', groups=1,pad_input=1, relu=0)
-        concat3 = tf.nn.relu(batch_norm(concat3,is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope='concat3' ))
+        concat3 = tf.nn.relu(batch_norm(concat3,is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope='concat3' ))
 
 
-##decoder
+        #decoder
+
+
         deconv1 = tf.nn.conv2d_transpose(concat3, 256, 4, stride=2, padding='SAME') ##??
-        deconv1 = tf.nn.relu(batch_norm(deconv1 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv1 = tf.nn.relu(batch_norm(deconv1 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
 
         deconv1 = tf.nn.conv2d(deconv1,3, 256, 256, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv1 = tf.nn.relu(batch_norm(deconv1 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv1 = tf.nn.relu(batch_norm(deconv1 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
 
 
 
 
         deconv2 = tf.nn.conv2d_transpose(deconv1, 128, 4, stride=2, padding='SAME') ##??
-        deconv2 = tf.nn.relu(batch_norm(deconv2 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv2 = tf.nn.relu(batch_norm(deconv2 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
 
         deconv2 = tf.nn.conv2d(deconv2,3, 128, 128, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv2 = tf.nn.relu(batch_norm(deconv2 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv2 = tf.nn.relu(batch_norm(deconv2 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
 
 
 
 
         deconv3 = tf.nn.conv2d_transpose(deconv2, 64, 4, stride=2, padding='SAME') ##??
-        deconv3 = tf.nn.relu(batch_norm(deconv3 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv3 = tf.nn.relu(batch_norm(deconv3 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
         net_layers['skip_deconv3'] = tf.concat([deconv3, gen_conv_bn3], 3) ##is this 0 dimension correct?
 
         deconv3 = tf.nn.conv2d(skip_deconv3,3, 64+64, 64, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv3 = tf.nn.relu(batch_norm(deconv3 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv3 = tf.nn.relu(batch_norm(deconv3 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
 
 
 
 
         deconv4 = tf.nn.conv2d_transpose(deconv3, 32, 4, stride=2, padding='SAME') ##??
-        deconv4 = tf.nn.relu(batch_norm(deconv4 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv4 = tf.nn.relu(batch_norm(deconv4 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
         net_layers['skip_deconv4'] = tf.concat([deconv4, gen_conv_bn2], 3) ##is this 0 dimension correct?
 
         deconv4 = tf.nn.conv2d(skip_deconv4,3, 32+32, 32, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv4 = tf.nn.relu(batch_norm(deconv4 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv4 = tf.nn.relu(batch_norm(deconv4 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
 
 
 
         deconv5 = tf.nn.conv2d_transpose(deconv4, 16, 4, stride=2, padding='SAME') ##??
-        deconv5 = tf.nn.relu(batch_norm(deconv5 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv5 = tf.nn.relu(batch_norm(deconv5 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
         net_layers['skip_deconv5'] = tf.concat([deconv5, gen_conv_bn1], 3) ##is this 0 dimension correct?
 
         deconv5 = tf.nn.conv2d(skip_deconv5,3, 16+16, 16, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv5 = tf.nn.relu(batch_norm(deconv5 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv5 = tf.nn.relu(batch_norm(deconv5 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
 
 
 
         deconv6 = tf.nn.conv2d_transpose(deconv5, 16, 4, stride=2, padding='SAME') ##??
-        deconv6 = tf.nn.relu(batch_norm(deconv6 , is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv6 = tf.nn.relu(batch_norm(deconv6 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
         net_layers['skip_deconv6'] = tf.concat([deconv6, self.input_imgs], 3) ##is this 0 dimension correct?
 
         deconv6 = tf.nn.conv2d(skip_deconv6, 3, 16+3, 16, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv6 = tf.nn.relu(batch_norm(deconv6, is_training=phase, updates_collections=None,reuse=reuse,zero_debias_moving_mean=True, scope=''))
+        deconv6 = tf.nn.relu(batch_norm(deconv6, is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
 
 
 #tanh
@@ -320,22 +314,22 @@ class Net_tvsn(object):
 
     def tvsn_discrim():
         feat1 =  self.conv(self.net_layers['predImg_final'],4,3,64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat1']= tf.nn.leaky_relu(batch_norm(gen_conv1,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='feat1'))
+        self.net_layers['feat1']= tf.nn.leaky_relu(batch_norm(gen_conv1,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat1'))
         
         feat2 =  self.conv(self.net_layers['feat1'],4,64,64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat2']= tf.nn.leaky_relu(batch_norm(gen_conv2,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='feat2'))
+        self.net_layers['feat2']= tf.nn.leaky_relu(batch_norm(gen_conv2,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat2'))
         
         feat3 =  self.conv(self.net_layers['feat2'],4,64,64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat3']= tf.nn.leaky_relu(batch_norm(gen_conv3,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='feat3'))
+        self.net_layers['feat3']= tf.nn.leaky_relu(batch_norm(gen_conv3,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat3'))
         
         feat4 =  self.conv(self.net_layers['feat3'],4,64,128,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat4']= tf.nn.leaky_relu(batch_norm(gen_conv4,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='feat4'))
+        self.net_layers['feat4']= tf.nn.leaky_relu(batch_norm(gen_conv4,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat4'))
         
         feat5 =  self.conv(self.net_layers['feat4'],4,128,256,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat5']= tf.nn.leaky_relu(batch_norm(gen_conv5,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='feat5'))
+        self.net_layers['feat5']= tf.nn.leaky_relu(batch_norm(gen_conv5,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat5'))
              
         feat6 =  self.conv(self.net_layers['feat5'],4,256,512,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat6']= tf.nn.leaky_relu(batch_norm(gen_conv6,decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='feat6'))
+        self.net_layers['feat6']= tf.nn.leaky_relu(batch_norm(gen_conv6,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat6'))
         out =  self.conv(self.net_layers['feat6'],4,512,1,name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=0)
         out = tf.nn.sigmoid(out)
         #out -> reshape to flatten out
