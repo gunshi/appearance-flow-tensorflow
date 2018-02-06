@@ -19,12 +19,11 @@ from scipy.misc import imsave
 tf.flags.DEFINE_integer("embedding_dim", 1000, "Dimensionality of character embedding (default: 300)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
-
-tf.flags.DEFINE_string("dataset_to_use", "", "training folder")
 tf.flags.DEFINE_string("kitti_odom_path", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/poses/", "training folder")
 tf.flags.DEFINE_string("kitti_parentpath", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/sequences/", "training folder")
-tf.flags.DEFINE_string("synthia_parentpath", "", "training folder")
-tf.flags.DEFINE_string("synthia_configpath", "", "training folder")
+
+tf.flags.DEFINE_string("synthia_odom_pathprefix", "", "training folder")
+tf.flags.DEFINE_string("synthia_seq_parentpath", "", "training folder")
 
 tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)")
 tf.flags.DEFINE_string("name", "result", "prefix names of the output files(default: result)")
@@ -73,6 +72,11 @@ seqstest=seqs[10:]
 
 #hard coded for now, add method to compute TODO
 imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200,11:920}
+
+
+
+
+
 inpH = InputHelper()
 inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)
 
