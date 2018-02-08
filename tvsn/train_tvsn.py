@@ -19,11 +19,17 @@ from scipy.misc import imsave
 tf.flags.DEFINE_integer("embedding_dim", 1000, "Dimensionality of character embedding (default: 300)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
+
+#kitti paths
 tf.flags.DEFINE_string("kitti_odom_path", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/poses/", "training folder")
 tf.flags.DEFINE_string("kitti_parentpath", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/sequences/", "training folder")
 
-tf.flags.DEFINE_string("synthia_odom_pathprefix", "", "training folder")
-tf.flags.DEFINE_string("synthia_seq_parentpath", "", "training folder")
+#synthia paths
+tf.flags.DEFINE_string("synthia_prefix", "/", "training folder")
+tf.flags.DEFINE_string("synthia_odom_path", "CameraParams/Stereo_Left/", "training folder")
+tf.flags.DEFINE_string("synthia_rgb_path", "RGB/Stereo_Left/", "training folder")
+tf.flags.DEFINE_string("synthia_semseg_path", "GT/COLOR/Stereo_Left/", "training folder")
+tf.flags.DEFINE_string("synthia_depth_path", "Depth/Stereo_Left/", "training folder")
 
 tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)")
 tf.flags.DEFINE_string("name", "result", "prefix names of the output files(default: result)")
@@ -45,6 +51,7 @@ tf.flags.DEFINE_string("summaries_dir", "./../summaries/", "Summary storage")
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
+tf.flags.DEFINE_integer("numseqs_synthia", 6, "kitti sequences")
 tf.flags.DEFINE_integer("batches_train", 6000 , "batches for train")
 tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
@@ -66,16 +73,18 @@ if FLAGS.kitti_parentpath==None:
     exit()
 
 seqs=[ i for i in range(0,FLAGS.numseqs) ]
-#break into train and test
+
+#kitti------------------------------------------
 seqstrain=seqs[0:10]
 seqstest=seqs[10:]
-
-#hard coded for now, add method to compute TODO
 imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200,11:920}
 
-
-
-
+#synthia----------------------------------------
+synthia_seasons_train = ['','','']
+synthia_test = [6]
+synthia_train = [1,2,3,4,5]
+synthia_all = [i for i in range(0,FLAGS.numseqs_synthia)]
+imgs_counts={}
 
 inpH = InputHelper()
 inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)

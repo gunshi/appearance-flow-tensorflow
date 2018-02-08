@@ -37,13 +37,11 @@ class InputHelper(object):
         for seq in seq_list:
             append_seqname="%02d.txt" % (seq,)
             odom_list=[]
-            for line in open(self.kitti_odompath+append_seqname):
+            for line in open(self.kitti_odompath + append_seqname):
                 val=line.split()
                 val=[float(ele) for ele in val]
                 odom_list.append(val)
             self.odomDict[seq]=odom_list
-
-
 
     def get_singlevw_info(self, batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec ):
 
@@ -75,6 +73,8 @@ class InputHelper(object):
             newrow = [0,0,0,1]
             odom_tgt_4x4 = np.vstack([odom_tgt, newrow])
             odom_src_4x4 = np.vstack([odom_src, newrow])
+
+
             odom_src_inv=linalg.inv(odom_src_4x4)
             #src inv * tgt = relative transform
             rel_odom_src_tgt=np.matmul(odom_src_inv,odom_tgt_4x4)
@@ -169,8 +169,6 @@ class InputHelper(object):
 
     def getKittiBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch,  get_img_tforms=1, is_multi_view=False):
 
-
-
         lenseq = len(seq_list)
         seq_idx = np.random.randint(0,lenseq)
         seq_num = seq_list[seq_idx]
@@ -204,7 +202,265 @@ class InputHelper(object):
 
         temp =  np.asarray(img_batch)
         return temp
+        
+#----------------------------------------------------------------------------------------------------------------------------
+#synthia functions
 
+    def compute_rel_odom(matA, matB): #A is src, B is dest
+        matA_inv=linalg.inv(matA_4x4)
+        #src inv * tgt = relative transform
+        rel_odom_src_tgt=np.matmul(matA_inv,matB)
+        ##converting to euler to get 6d =(3+3) dimensional vector for pose
+        rel_tform_rot=rel_odom_src_tgt[0:3,0:3]
+        rx,ry,rz = euler_from_matrix(rel_tform_rot)
+        rel_tform_vec = [ rel_odom_src_tgt[0,3], rel_odom_src_tgt[1,3], rel_odom_src_tgt[2,3], rx, ry, rz]
+        a = np.array((rel_odom_src_tgt[0,3], rel_odom_src_tgt[1,3], rel_odom_src_tgt[2,3]))
+        dist = numpy.linalg.norm(a)
+        return rel_tform_vec, dist
+
+    def load_framestats(file_path):
+        fileobj = open(file_path)
+        nums = []
+        for line in fileobj:
+            nums.append(int(line))
+        return nums
+
+
+#selection, single vs multi?
+#load info
+#normalise imgs change
+#main train file, accept and send proper args
+
+    def get_singlevw_info_synthia(self, batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec ):
+
+        imgpaths_src=[]
+        imgpaths_tgt=[]
+        tforms_imgs=[]
+
+        seq_path = self.kitti_parentpath+"%02d/" % (seq_num,)
+        odomlist=self.odomDict[seq_num]
+
+        for x in range(batch_size):
+            src_img_num=np.random.randint(0,seq_imgs_num)
+            radius_num=np.random.randint(1,sample_range+1)
+            odom_src=odomlist[src_img_num]
+            odom_src=np.reshape(odom_src,(3,4))
+            if random()>0.5:
+                if (src_img_num-radius_num)>0:
+                    tgt_img_num=src_img_num-radius_num
+                else:
+                    tgt_img_num=src_img_num+radius_num
+            else:
+                if (src_img_num+radius_num)<seq_imgs_num-1:
+                    tgt_img_num=src_img_num+radius_num
+                else:
+                    tgt_img_num=src_img_num-radius_num
+
+            odom_tgt = odomlist[tgt_img_num]
+            odom_tgt = np.reshape(odom_tgt,(3,4))
+            newrow = [0,0,0,1]
+            odom_tgt_4x4 = np.vstack([odom_tgt, newrow])
+            odom_src_4x4 = np.vstack([odom_src, newrow])
+
+
+            odom_src_inv = linalg.inv(odom_src_4x4)
+            #src inv * tgt = relative transform
+            rel_odom_src_tgt = np.matmul(odom_src_inv,odom_tgt_4x4)
+            ##converting to euler to get 6d =(3+3) dimensional vector for pose
+            rel_tform_rot=rel_odom_src_tgt[0:3,0:3]
+            rx,ry,rz = euler_from_matrix(rel_tform_rot)
+            rel_tform_vec = [ rel_odom_src_tgt[0,3], rel_odom_src_tgt[1,3], rel_odom_src_tgt[2,3], rx, ry, rz]
+            heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0]*conv_model_spec[1][1],1))
+            widthwise = np.reshape(heightwise, (conv_model_spec[1][0],conv_model_spec[1][1],-1))
+            tforms_imgs.append(widthwise)
+
+            src_img_path=seq_path+ 'image_2/' +'%06d.png' % (src_img_num,)
+            tgt_img_path=seq_path+ 'image_2/' +'%06d.png' % (tgt_img_num,)
+            imgpaths_src.append(src_img_path)
+            imgpaths_tgt.append(tgt_img_path)
+
+        return [imgpaths_src], [tforms_imgs], imgpaths_tgt
+
+    def get_multivw_info_synthia(self, batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec ):
+
+        imgpaths_src=[[] for i in range(2)]
+        imgpaths_tgt=[]
+        tforms_imgs=[[] for i in range(2)]
+
+        seq_path = self.kitti_parentpath+"%02d/" % (seq_num,)
+        odomlist=self.odomDict[seq_num]
+
+        for x in range(batch_size):
+
+            src_img_num = np.random.randint(0,seq_imgs_num)
+            radius_num_a = np.random.randint(1,int(sample_range/2)+1)
+            radius_num_b = np.random.randint(1,int(sample_range/2)+1)
+            odom_src = odomlist[src_img_num]
+            odom_src = np.reshape(odom_src,(3,4))
+
+            if random()>0.5:
+                if (src_img_num - sample_range) > 2:
+                    tgt_img_num = src_img_num - radius_num_a
+                    aux_img_num = tgt_img_num - radius_num_b
+                else:
+                    tgt_img_num = src_img_num + radius_num_a
+                    aux_img_num = tgt_img_num + radius_num_b
+
+
+            else:
+                if (src_img_num + sample_range ) < seq_imgs_num - 3:
+                    tgt_img_num = src_img_num + radius_num_a
+                    aux_img_num = tgt_img_num + radius_num_b
+
+                else:
+                    tgt_img_num = src_img_num - radius_num_a
+                    aux_img_num = tgt_img_num - radius_num_b
+
+
+            odom_tgt=odomlist[tgt_img_num]
+            odom_tgt=np.reshape(odom_tgt,(3,4))
+
+            odom_aux=odomlist[aux_img_num]
+            odom_aux=np.reshape(odom_aux,(3,4))
+
+            newrow = [0,0,0,1]
+            odom_tgt_4x4 = np.vstack([odom_tgt, newrow])
+            odom_src_4x4 = np.vstack([odom_src, newrow])
+            odom_aux_4x4 = np.vstack([odom_aux, newrow])
+
+            src_matrices = []
+            src_matrices.append(odom_src_4x4)
+            src_matrices.append(odom_aux_4x4)
+
+            for mat in src_matrices:
+
+                odom_src_inv=linalg.inv(mat)
+                #src inv * tgt = relative transform
+                rel_odom_src_tgt=np.matmul(odom_src_inv,odom_tgt_4x4)
+                ##converting to euler to get 6d =(3+3) dimensional vector for pose
+                rel_tform_rot = rel_odom_src_tgt[0:3,0:3]
+                rx,ry,rz = euler_from_matrix(rel_tform_rot)
+                rel_tform_vec = [ rel_odom_src_tgt[0,3], rel_odom_src_tgt[1,3], rel_odom_src_tgt[2,3], rx, ry, rz]
+                heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0]*conv_model_spec[1][1],1))
+                widthwise = np.reshape(heightwise, (conv_model_spec[1][0],conv_model_spec[1][1],-1))
+                tforms_imgs[src_matrices.index(mat)].append(widthwise)
+
+            src_img_path=seq_path+ 'image_2/' +'%06d.png' % (src_img_num,)
+            aux_img_path=seq_path+ 'image_2/' +'%06d.png' % (aux_img_num,)
+            tgt_img_path=seq_path+ 'image_2/' +'%06d.png' % (tgt_img_num,)
+            imgpaths_src[0].append(src_img_path)
+            imgpaths_src[1].append(aux_img_path)
+            imgpaths_tgt.append(tgt_img_path)
+
+        return imgpaths_src, tforms_imgs, imgpaths_tgt
+
+
+    #same as kitti method so maybe fuse?
+    def getSynthiaBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch,  get_img_tforms=1, is_multi_view=False):
+
+        lenseq = len(seq_list)
+        seq_idx = np.random.randint(0,lenseq)
+        seq_num = seq_list[seq_idx]
+        seq_imgs_num = img_num_dict[seq_num]
+        src_imgslist = []
+
+        if(is_multi_view):
+            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_multivw_info( batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec)
+        else:
+            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_singlevw_info( batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec)
+
+        for srclists in imgpaths_src:
+            src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch))
+
+        tgt_imgslist = self.load_preprocess_images_kitti(imgpaths_tgt, conv_model_spec,epoch)
+
+        return src_imgslist,tgt_imgslist,tforms_imgs
+
+    def odom_filter():
+        self.odomDict_synthia_filtered = {}
+        for seq in self.seq_list:
+            for season in self.season_list:
+                temp_list = self.odomDict_synthia[seq][season]
+                new_list = []
+                indices = []
+                indices.append(0)
+                new_list.append(origin)
+                origin = temp_list[0]
+                counter = 0
+                for temp_iter in range(1,len(temp_list)):
+                    dest = temp_list[temp_iter] #odom element
+                    rel_odom, dist = compute_rel_odom(origin,dest)
+                    if(dist > 0.03):
+                        new_list.append(dist)
+                        indices.append(iterator)
+                        origin = dest
+                self.odomDict_synthia_filtered[seq][season] = [new_list,indices]
+
+        #clear self.odomdict original
+
+
+
+    def setup_synthia(self, odompath, parentpath, rgbpath, seq_list, season_list, sempath='', depthpath=''):
+
+        self.odomDict_synthia = {}
+        self.synthia_odom_path = odompath
+        self.synthia_depth_path = depthpath
+        self.synthia_rgb_path = rgbpath
+        self.synthia_sem_path = sempath
+        self.synthia_parentpath = parentpath
+        self.seq_list = seq_list
+        self.season_list = season_list
+        self.setOdomInfo_synthia(seq_list, season_list)
+
+
+
+
+
+
+    def setOdomInfo_synthia(self, seq_list, season_list):
+
+        for seq in seq_list:
+            self.odomDict_synthia[seq]={}
+            for season in season_list:
+                if(season in self.synthia_dict[seq]):
+                    odom_path = self.synthia_parentpath + 'SYNTHIA-SEQS-0' + str(seq) + '-' + season + '/' + self.synthia_odom_path + 'Omni_F/concat.txt'
+                    odom_list=[]
+                    for line in open(odom_path):
+                        val=line.split()
+                        val=[float(ele) for ele in val]
+                        nums = np.reshape(val, (4,4), order='F')
+                        odom_list.append(nums)
+                    self.odomDict_synthia[seq][season] = odom_list
+
+    def synthia_strip(file_path):
+        info = []
+        fileobj = open(file_path)
+        current = 0
+        seq_iter = 0
+        info_dict= {}
+        for line in fileobj:
+            seq_num,season = get_num_and_season(line)
+            if(current!=seq_num):
+                info_dict[seq_num] = {}
+                info_dict[seq_num][season] = seq_iter
+            else:
+                info_dict[seq_num][season] = seq_iter
+            current = seq_num
+            info.append((seq_num,season))
+            seq_iter +=1
+        return info, info_dict
+
+
+    def get_num_and_season(line):
+        parts = line.split('-')
+        #synthia
+        #seqs
+        #num
+        #season
+        seq_num = int(parts[2])
+        season = parts[3]
+        return seq_num, season
+#----------------------------------------------------------------------------------------------------------------------------
 
     def batch_iter(self, x1, x2, y, video_lengths, batch_size, num_epochs, conv_model_spec, shuffle=True, is_train=True):
         """
