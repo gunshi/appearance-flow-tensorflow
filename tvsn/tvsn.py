@@ -7,7 +7,7 @@ from scipy import misc
 from bilinear_sampler import bilinear_sampler
 import math
 from tf.contrib.layers import batch_norm
-
+from tf.contrib.resampler import resampler
 
 class Net_tvsn(object):
     def initalize(self, sess):
@@ -22,9 +22,9 @@ class Net_tvsn(object):
                 temp = tf.get_variable('biases')
                 sess.run(temp.assign(pre_trained_weights[k]['biases']))
 
-    def conv(self, input_, filter_size, in_channels, out_channels, name, strides, padding, groups, pad_input=1, relu=1):
+    def conv(self, input_, filter_size, in_channels, out_channels, name, strides, padding, groups, pad_input=1, relu=1, pad_num=1):
         if pad_input==1:
-            paddings = tf.constant([ [0, 0], [1, 1,], [1, 1], [0, 0] ])
+            paddings = tf.constant([ [0, 0], [pad_num, pad_num,], [pad_num, pad_num], [0, 0] ])
             input_ = tf.pad(input_, paddings, "CONSTANT")
 
         with tf.variable_scope(name) as scope:
@@ -66,36 +66,28 @@ class Net_tvsn(object):
 
 
     def doafn():
+
+        #input is mean subtracted, normalised to -1 to 1
         debug = True
         net_layers = {}
-        #placeholder for a random set of <batch_size> images of fixed size -- 224,224
         self.input_imgs = tf.placeholder(tf.float32, shape = [None, 256, 256, 3], name = "input_imgs")
         self.input_batch_size = tf.shape(self.input_imgs)[0]  # Returns a scalar `tf.Tensor`
         self.tform = tf.placeholder(tf.float32, shape = [None, 6], name = "tform") #or 12?
-        #mean is already subtracted in helper.py as part of preprocessing
+
         # Conv-Layers
-        net_layers['Convolution1'] = self.conv(net_layers['input_imgs'], 5, 3 , 16, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        net_layers['Convolution2'] = self.conv(net_layers['Convolution1'], 5, 16 , 32, name= 'Convolution2', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 5, 32 , 64, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['Convolution1'] = self.conv(net_layers['input_imgs'], 5, 3 , 16, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
+        net_layers['Convolution2'] = self.conv(net_layers['Convolution1'], 5, 16 , 32, name= 'Convolution2', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
+        net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 5, 32 , 64, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
         net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 64 , 128, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution5'] = self.conv(net_layers['Convolution4'], 3, 128 , 256, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution6'] = self.conv(net_layers['Convolution4'], 3, 256 , 512, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
 
 
         ##add fcs for bottleneck with transform info
-        net_layers['fc6'] = self.fc(net_layers['Convolution6'], 4*4*512 , 2048, name='fc1', relu = 1)
-
-
-        #if self.is_train:
-        #    net_layers['fc6'] = tf.nn.dropout(net_layers['fc6'], self.keep_prob)
-
+        net_layers['fc_conv6'] = self.fc(net_layers['Convolution6'], 4*4*512 , 2048, name='fc_conv6', relu = 1)
         net_layers['view_fc1'] = self.fc(self.tform, 6 , 128, name='view_fc1', relu = 1)
-        #if self.is_train:
-        #    net_layers['fc2'] = tf.nn.dropout(net_layers['fc2'], self.keep_prob)
-
-        net_layers['view_fc2'] = self.fc(self.tform, 128 , 256, name='view_fc2', relu = 1)
-
-        net_layers['view_concat'] = tf.concat([net_layers['fc6'], net_layers['view_fc2']], 0) ##is this 0 dimension correct?
+        net_layers['view_fc2'] = self.fc(view_fc1, 128 , 256, name='view_fc2', relu = 1)
+        net_layers['view_concat'] = tf.concat([net_layers['fc_conv6'], net_layers['view_fc2']], 0) ##is this 0 dimension correct?
 
         net_layers['de_fc1'] = self.fc(net_layers['view_concat'], 2304 , 2048, name='de_fc1', relu = 1)
         
@@ -108,16 +100,14 @@ class Net_tvsn(object):
             net_layers['de_fc2'] = tf.nn.dropout(net_layers['de_fc2'], self.keep_prob)
 
         net_layers['de_fc3'] = self.fc(net_layers['view_concat'], 2048 , 512*4*4, name='de_fc3', relu = 1)
-        
-        
-
         net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 4, 512], name='de_fc3_rs')
+       
 
 
 
 
         #check paddings! especially for 5 size kernel case!
-
+        #THEY HAVE DONE NEAREST NEIGHBOUR RESAMPLING NOT BILINEAR
         deconv1_x2 = tf.image.resize_bilinear(net_layers['de_fc3_rs'], [8, 8])
         net_layers['deconv1'] = self.conv(deconv1_x2, 3, 512 , 256, name= 'deconv1', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
 
@@ -129,29 +119,27 @@ class Net_tvsn(object):
         net_layers['deconv3'] = self.conv(deconv3_x2, 3, 128 , 64, name= 'deconv3', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
 
         deconv4_x2 = tf.image.resize_bilinear(net_layers['deconv3'], [64, 64])
-        net_layers['deconv4'] = self.conv(deconv4_x2, 5, 64 , 32, name= 'deconv4', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['deconv4'] = self.conv(deconv4_x2, 5, 64 , 32, name= 'deconv4', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
 
         deconv5_x2 = tf.image.resize_bilinear(net_layers['deconv4'], [128, 128])
-        net_layers['deconv5'] = self.conv(deconv5_x2, 5, 32 , 16, name= 'deconv5', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['deconv5'] = self.conv(deconv5_x2, 5, 32 , 16, name= 'deconv5', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
         
         deconv6_x2 = tf.image.resize_bilinear(net_layers['deconv5'], [256, 256])
-        net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 2, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1))
+        net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 2, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
 
 
         #remap using bilinear on (flow(deconv6) and input_imgs) to get predImg
-        net_layers['predImg']=bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
+        net_layers['predImg'] = bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
 
         deconv_x2_mask = tf.image.resize_bilinear(net_layers['deconv5'], [256, 256])
-        net_layers['deconv_mask'] = self.conv(deconv_x2_mask, 5, 16 , 1, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
 
+        #net_layers['deconv_mask'] = tf.nn.sigmoid(self.conv(deconv_x2_mask, 5, 16 , 2, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
 
-
-
-
-
-        #deconv5 (16 channels should be), upsample, then conv to 1 channel
+        net_layers['deconv_mask'] = self.conv(deconv_x2_mask, 5, 16 , 2, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
 
         self.net_layers = net_layers
+
+        #resampler(self.input_imgs,net_layers['flow_aux'],name='resampler')
 
 
     def afn_old(self):
@@ -405,12 +393,47 @@ class Net_tvsn(object):
         return tf.get_variable(name="up_filter", initializer=init,
                                shape=weights.shape)
 
-    def reconstruction_loss(self,real_images, generated_images):
+    def reconstruction_loss(self,real_images, generated_images, mask):
         """
         The reconstruction loss is defined as the sum of the L1 distances
         between the target images and their generated counterparts
         """
-        return tf.reduce_mean (tf.abs(real_images - generated_images))
+        ref_exp_mask = self.get_reference_explain_mask(s)
+
+                        curr_exp_logits = tf.slice(pred_exp_logits[s], 
+                                                   [0, 0, 0, i*2], 
+                                                   [-1, -1, -1, 2])
+                        exp_loss += opt.explain_reg_weight * \
+                            self.compute_exp_reg_loss(curr_exp_logits,
+                                                      ref_exp_mask)
+                        curr_exp = tf.nn.softmax(curr_exp_logits)
+                    # Photo-consistency loss weighted by explainability
+        pixel_loss += tf.reduce_mean(curr_proj_error * \
+tf.expand_dims(curr_exp[:,:,:,1], -1))
+
+
+
+
+        return tf.reduce_mean (tf.abs(real_images - generated_images) * tf.expand_dims(curr_exp[:,:,:,1], -1)  )
+
+    def get_reference_explain_mask(self, downscaling):
+        opt = self.opt
+        tmp = np.array([0,1])
+        ref_exp_mask = np.tile(tmp, 
+                               (opt.batch_size, 
+                                int(opt.img_height/(2**downscaling)), 
+                                int(opt.img_width/(2**downscaling)), 
+                                1))
+        ref_exp_mask = tf.constant(ref_exp_mask, dtype=tf.float32)
+    return ref_exp_mask
+
+
+
+    def compute_exp_reg_loss(self, pred, ref):
+        l = tf.nn.softmax_cross_entropy_with_logits(
+            labels=tf.reshape(ref, [-1, 2]),
+            logits=tf.reshape(pred, [-1, 2]))
+    return tf.reduce_mean(l)
 
     def vgg_loss():
 
@@ -427,9 +450,7 @@ class Net_tvsn(object):
         
 
     def loss_doafn():
-        self.tgt_imgs
-        self.net_layers['doafn_pred_img']
-        self.net_layers['doafn_exp_map']
+        self.reconstruction_loss( self.tgts, self.tgt_imgs, self.net_layers['deconv_mask'])
         #explainability weighted loss with input img
 
     def __init__(self, batch_size, trainable):
@@ -445,13 +466,12 @@ class Net_tvsn(object):
 
         self.doafn()
 
-        ##assign
         ##assert and cast them to same size!!!!
         self.tgts=self.net_layers['predImg']
         print('.......')
         print(self.tgts.get_shape())
         with tf.name_scope("loss"):
-          self.loss = self.reconstruction_loss(self.tgts, self.tgt_imgs)
+          self.loss = self.loss_doafn()
 
 
         tf.summary.scalar('loss', self.loss)
