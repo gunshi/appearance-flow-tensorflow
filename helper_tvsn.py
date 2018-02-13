@@ -227,18 +227,22 @@ class InputHelper(object):
 
 
 #selection, single vs multi?
-#load info
+#load frame num info
 #normalise imgs change
 #main train file, accept and send proper args
+#what about seq imgs dict when no filter
+#make only one (filter/non filter persist)
+#synthia mats are 4x4, so remove odom_src manipulation code
 
-    def get_singlevw_info_synthia(self, batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec ):
+    def get_singlevw_info_synthia(self, batch_size, sample_range, seq_num, season, seq_imgs_num, conv_model_spec ):
 
         imgpaths_src=[]
         imgpaths_tgt=[]
         tforms_imgs=[]
 
-        seq_path = self.kitti_parentpath+"%02d/" % (seq_num,)
-        odomlist=self.odomDict[seq_num]
+        seq_path = self.synthia_parentpath+"SYNTHIA-SEQS-%02d-" + season + "/" % (seq_num,)
+        odomlist = self.odomDict_synthia_filtered[seq_num][season]
+
 
         for x in range(batch_size):
             src_img_num=np.random.randint(0,seq_imgs_num)
@@ -355,19 +359,21 @@ class InputHelper(object):
         return imgpaths_src, tforms_imgs, imgpaths_tgt
 
 
-    #same as kitti method so maybe fuse?
-    def getSynthiaBatch(self,batch_size, sample_range, seq_list, is_train, img_num_dict, conv_model_spec, epoch,  get_img_tforms=1, is_multi_view=False):
+    def getSynthiaBatch(self,batch_size, sample_range, seq_list, is_train, conv_model_spec, epoch,  get_img_tforms=1, is_multi_view=False):
 
         lenseq = len(seq_list)
         seq_idx = np.random.randint(0,lenseq)
         seq_num = seq_list[seq_idx]
-        seq_imgs_num = img_num_dict[seq_num]
+        seasons = len(self.synthia_info_dict[seq_num])
+        season_idx = np.random.randint(0,season_idx)
+        season_val = list(self.synthia_info_dict[seq_num].keys())[season_idx]
+        seq_imgs_num = self.img_num_dict_synthia[seq_num][season_val]
         src_imgslist = []
 
         if(is_multi_view):
-            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_multivw_info( batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec)
+            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_multivw_info( batch_size, sample_range, seq_num, season_val, seq_imgs_num, conv_model_spec)
         else:
-            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_singlevw_info( batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec)
+            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_singlevw_info( batch_size, sample_range, seq_num, season_val, seq_imgs_num, conv_model_spec)
 
         for srclists in imgpaths_src:
             src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch))
@@ -378,7 +384,10 @@ class InputHelper(object):
 
     def odom_filter():
         self.odomDict_synthia_filtered = {}
+        self.img_num_dict_synthia ={}
         for seq in self.seq_list:
+            self.odomDict_synthia_filtered[seq]={}
+            self.img_num_dict_synthia[seq]={}
             for season in self.season_list:
                 temp_list = self.odomDict_synthia[seq][season]
                 new_list = []
@@ -394,13 +403,14 @@ class InputHelper(object):
                         new_list.append(dist)
                         indices.append(iterator)
                         origin = dest
+                self.img_num_dict_synthia[seq][season] = len(new_list)
                 self.odomDict_synthia_filtered[seq][season] = [new_list,indices]
 
         #clear self.odomdict original
 
 
 
-    def setup_synthia(self, odompath, parentpath, rgbpath, seq_list, season_list, sempath='', depthpath=''):
+    def setup_synthia(self, odompath, parentpath, rgbpath, seq_list, season_list, seqname_filepath, sempath='', depthpath='', filter_odom = True):
 
         self.odomDict_synthia = {}
         self.synthia_odom_path = odompath
@@ -411,10 +421,10 @@ class InputHelper(object):
         self.seq_list = seq_list
         self.season_list = season_list
         self.setOdomInfo_synthia(seq_list, season_list)
-
-
-
-
+        if filter_odom:
+            self.filter_odom = True
+            self.odom_filter()
+        self.synthia_set_seq_info(seqname_filepath)
 
 
     def setOdomInfo_synthia(self, seq_list, season_list):
@@ -432,7 +442,7 @@ class InputHelper(object):
                         odom_list.append(nums)
                     self.odomDict_synthia[seq][season] = odom_list
 
-    def synthia_strip(file_path):
+    def synthia_set_seq_info(file_path):
         info = []
         fileobj = open(file_path)
         current = 0
@@ -448,7 +458,8 @@ class InputHelper(object):
             current = seq_num
             info.append((seq_num,season))
             seq_iter +=1
-        return info, info_dict
+        self.info_synthia = info
+        self.synthia_info_dict = info_dict
 
 
     def get_num_and_season(line):

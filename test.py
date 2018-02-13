@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from bilinear_sampler import bilinear_sampler
+from tf.contrib.resampler import resampler
 
 
 # code to test bilinear_sampler.py
@@ -14,8 +15,15 @@ z = bilinear_sampler(x, v)
 
 with tf.Session() as sess:
 
-  x_,z_= sess.run([x,z])
-  print(x_)
+	x_,z_= sess.run([x,z])
+  	z2 = resampler(x_,v)
 
-  print(z_)
+  	#add coords
+  	z3 = resampler(x_,)
+
+  
+
+  	print(x_)
+
+  	print(z_)
 
