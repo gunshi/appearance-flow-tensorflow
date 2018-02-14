@@ -393,36 +393,25 @@ class Net_tvsn(object):
         return tf.get_variable(name="up_filter", initializer=init,
                                shape=weights.shape)
 
-    def reconstruction_loss(self,real_images, generated_images, mask):
+    def reconstruction_loss(self, real_images, generated_images, mask):
         """
         The reconstruction loss is defined as the sum of the L1 distances
         between the target images and their generated counterparts
         """
-        ref_exp_mask = self.get_reference_explain_mask(s)
+        ref_exp_mask = self.get_reference_explain_mask(self.batch_size, self.scale_size[0], self.scale_size[1])
+        exp_loss = self.explain_reg_weight * self.compute_exp_reg_loss(mask, ref_exp_mask)
+        curr_exp = tf.nn.softmax(mask)
+        curr_proj_error = tf.abs(real_images - generated_images)
+        pixel_loss = tf.reduce_mean(curr_proj_error * tf.expand_dims(curr_exp[:,:,:,1], -1))
+        
+        return pixel_loss
 
-                        curr_exp_logits = tf.slice(pred_exp_logits[s], 
-                                                   [0, 0, 0, i*2], 
-                                                   [-1, -1, -1, 2])
-                        exp_loss += opt.explain_reg_weight * \
-                            self.compute_exp_reg_loss(curr_exp_logits,
-                                                      ref_exp_mask)
-                        curr_exp = tf.nn.softmax(curr_exp_logits)
-                    # Photo-consistency loss weighted by explainability
-        pixel_loss += tf.reduce_mean(curr_proj_error * \
-tf.expand_dims(curr_exp[:,:,:,1], -1))
-
-
-
-
-        return tf.reduce_mean (tf.abs(real_images - generated_images) * tf.expand_dims(curr_exp[:,:,:,1], -1)  )
-
-    def get_reference_explain_mask(self, downscaling):
-        opt = self.opt
+    def get_reference_explain_mask(self, batch_size,height, width):
         tmp = np.array([0,1])
         ref_exp_mask = np.tile(tmp, 
-                               (opt.batch_size, 
-                                int(opt.img_height/(2**downscaling)), 
-                                int(opt.img_width/(2**downscaling)), 
+                               (batch_size, 
+                                height, 
+                                width, 
                                 1))
         ref_exp_mask = tf.constant(ref_exp_mask, dtype=tf.float32)
     return ref_exp_mask
@@ -433,7 +422,7 @@ tf.expand_dims(curr_exp[:,:,:,1], -1))
         l = tf.nn.softmax_cross_entropy_with_logits(
             labels=tf.reshape(ref, [-1, 2]),
             logits=tf.reshape(pred, [-1, 2]))
-    return tf.reduce_mean(l)
+        return tf.reduce_mean(l)
 
     def vgg_loss():
 

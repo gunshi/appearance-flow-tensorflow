@@ -227,18 +227,16 @@ class InputHelper(object):
 
 
 #selection, single vs multi?
-#load frame num info
 #normalise imgs change
 #main train file, accept and send proper args
 #what about seq imgs dict when no filter
 #make only one (filter/non filter persist)
-#synthia mats are 4x4, so remove odom_src manipulation code
 
     def get_singlevw_info_synthia(self, batch_size, sample_range, seq_num, season, seq_imgs_num, conv_model_spec ):
 
         imgpaths_src=[]
         imgpaths_tgt=[]
-        tforms_imgs=[]
+        tforms=[]
 
         seq_path = self.synthia_parentpath+"SYNTHIA-SEQS-%02d-" + season + "/" % (seq_num,)
         odomlist = self.odomDict_synthia_filtered[seq_num][season]
@@ -247,8 +245,7 @@ class InputHelper(object):
         for x in range(batch_size):
             src_img_num=np.random.randint(0,seq_imgs_num)
             radius_num=np.random.randint(1,sample_range+1)
-            odom_src=odomlist[src_img_num]
-            odom_src=np.reshape(odom_src,(3,4))
+            odom_src_4x4=odomlist[src_img_num]
             if random()>0.5:
                 if (src_img_num-radius_num)>0:
                     tgt_img_num=src_img_num-radius_num
@@ -260,12 +257,7 @@ class InputHelper(object):
                 else:
                     tgt_img_num=src_img_num-radius_num
 
-            odom_tgt = odomlist[tgt_img_num]
-            odom_tgt = np.reshape(odom_tgt,(3,4))
-            newrow = [0,0,0,1]
-            odom_tgt_4x4 = np.vstack([odom_tgt, newrow])
-            odom_src_4x4 = np.vstack([odom_src, newrow])
-
+            odom_tgt_4x4 = odomlist[tgt_img_num]
 
             odom_src_inv = linalg.inv(odom_src_4x4)
             #src inv * tgt = relative transform
@@ -274,16 +266,20 @@ class InputHelper(object):
             rel_tform_rot=rel_odom_src_tgt[0:3,0:3]
             rx,ry,rz = euler_from_matrix(rel_tform_rot)
             rel_tform_vec = [ rel_odom_src_tgt[0,3], rel_odom_src_tgt[1,3], rel_odom_src_tgt[2,3], rx, ry, rz]
-            heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0]*conv_model_spec[1][1],1))
-            widthwise = np.reshape(heightwise, (conv_model_spec[1][0],conv_model_spec[1][1],-1))
-            tforms_imgs.append(widthwise)
 
-            src_img_path=seq_path+ 'image_2/' +'%06d.png' % (src_img_num,)
-            tgt_img_path=seq_path+ 'image_2/' +'%06d.png' % (tgt_img_num,)
+
+
+            #reform tform img and add tform ony instead
+            #heightwise = np.tile(rel_tform_vec,(conv_model_spec[1][0]*conv_model_spec[1][1],1))
+            #widthwise = np.reshape(heightwise, (conv_model_spec[1][0],conv_model_spec[1][1],-1))
+            tforms.append(rel_tform_vec)
+
+            src_img_path = seq_path+ 'RGB/Stereo_Left/Omni_F/' +'%06d.png' % (src_img_num,)
+            tgt_img_path = seq_path+ 'RGB/Stereo_Left/Omni_F/' +'%06d.png' % (tgt_img_num,)
             imgpaths_src.append(src_img_path)
             imgpaths_tgt.append(tgt_img_path)
 
-        return [imgpaths_src], [tforms_imgs], imgpaths_tgt
+        return [imgpaths_src], [tforms], imgpaths_tgt
 
     def get_multivw_info_synthia(self, batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec ):
 
