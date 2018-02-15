@@ -12,6 +12,7 @@ import gzip
 from random import random
 from tvsn import Net_tvsn
 from scipy.misc import imsave
+import sys
 # Parameters
 # ==================================================
 
@@ -30,7 +31,7 @@ tf.flags.DEFINE_string("kitti_parentpath", "/home/tushar/dataset/Datasets/Kitti_
 tf.flags.DEFINE_string("synthia_parentpath", "/home/gunshi/Downloads/synthia/", "training folder")
 tf.flags.DEFINE_string("synthia_configpath", "SYNTHIA_data.txt", "training folder")
 tf.flags.DEFINE_string("synthia_frame_info_path", "FRAMES_SYNTHIA.txt", "training folder")
-f.flags.DEFINE_string("synthia_odom_path", "CameraParams/Stereo_Left/", "training folder")
+tf.flags.DEFINE_string("synthia_odom_path", "CameraParams/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_rgb_path", "RGB/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_semseg_path", "GT/COLOR/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_depth_path", "Depth/Stereo_Left/", "training folder")
@@ -42,7 +43,7 @@ tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)
 tf.flags.DEFINE_string("name", "result", "prefix names of the output files(default: result)")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 30, "Batch Size (default: 10)")
+tf.flags.DEFINE_integer("batch_size", 15, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("sample_range", 5, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
@@ -56,7 +57,7 @@ tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on 
 tf.flags.DEFINE_string("summaries_dir", "/home/gunshi/Downloads/network_outputs/summaries/", "Summary storage")
 
 #Model Parameters
-tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
+tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
 tf.flags.DEFINE_integer("batches_train", 6000 , "batches for train")
 tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
@@ -64,6 +65,7 @@ tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: F
 tf.flags.DEFINE_boolean("multi_view_training", False, "Training ConvNet (Default: False)")
 
 FLAGS = tf.flags.FLAGS
+#FLAGS(sys.argv)
 FLAGS._parse_flags()
 print("\nParameters:")
 for attr, value in sorted(FLAGS.__flags.items()):
@@ -94,7 +96,7 @@ if(FLAGS.dataset_to_use=='SYNTHIA'):
     seqstest = [4]
     seqstrain = [1,2]
     imgs_counts = {1:{'DAWN':1451},2:{'FALL':742},4:{'SUMMER':901, 'SPRING':959},5:{},6:{}}
-    inpH.setup_synthia_sparse(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath, FLAGS.kitti_rgb_path, imgs_counts)
+    inpH.setup_synthia_sparse(FLAGS.synthia_odom_path, FLAGS.synthia_parentpath, FLAGS.synthia_rgb_path, imgs_counts)
 
 
 # Training
@@ -111,13 +113,13 @@ with tf.Graph().as_default():
     print("started session")
     with sess.as_default():
         if(FLAGS.multi_view_training):
-            convModel = Net_MultiView(
+            convModel = Net_tvsn(
                  FLAGS.batch_size,
                  FLAGS.conv_net_training,
                  FLAGS.exp_reg_weight)
         else:
 
-            convModel = Net(
+            convModel = Net_tvsn(
              FLAGS.batch_size,
              FLAGS.conv_net_training,
              FLAGS.exp_reg_weight)
@@ -221,13 +223,19 @@ with tf.Graph().as_default():
                         convModel.aux_imgs: src_batch[1],
                         convModel.tgt_imgs: tgt_batch,
                         convModel.tform: tform_batch[0],
-                        convModel.tform_aux: tform_batch[1] }
+                        convModel.tform_aux: tform_batch[1] ,
+                        convModel.keep_prob: FLAGS.dropout_keep_prob,
+                        convModel.is_train:False
+                        }
 
         else:
 
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.tgt_imgs: tgt_batch,
-                        convModel.tform: tform_batch[0] }
+                        convModel.tform: tform_batch[0], 
+                        convModel.keep_prob: FLAGS.dropout_keep_prob,
+                        convModel.is_train:False
+                        }
 
 
 

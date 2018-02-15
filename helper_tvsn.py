@@ -16,9 +16,7 @@ import matplotlib.pyplot as pyplot
 #sys.setdefaultencoding("utf-8")
 import numpy.linalg as linalg
 from transformations import euler_from_matrix
-#import imgaug as ia
-#from imgaug import augmenters as iaa
-#from imgaug import parameters as iap
+
 
 
 class InputHelper(object):
@@ -202,9 +200,6 @@ class InputHelper(object):
 
         temp =  np.asarray(img_batch)
         return temp
-        
-#----------------------------------------------------------------------------------------------------------------------------
-#synthia functions
 
     def compute_rel_odom(matA, matB): #A is src, B is dest
         matA_inv=linalg.inv(matA_4x4)
@@ -224,12 +219,6 @@ class InputHelper(object):
         for line in fileobj:
             nums.append(int(line))
         return nums
-
-#normalise imgs change
-#main train file, accept and send proper args
-#what about seq imgs dict when no filter
-#make only one (filter/non filter persist)
-#pick up from filtered dicts only
 
     def get_singlevw_info_synthia(self, batch_size, sample_range, seq_num, season, seq_imgs_num, conv_model_spec ):
 
@@ -404,7 +393,6 @@ class InputHelper(object):
 
         #clear self.odomdict original
 
-
     """
     def setup_synthia(self, odompath, parentpath, rgbpath, seq_list, season_list, seqname_filepath, sempath='', depthpath='', filter_odom = True):
 
@@ -510,7 +498,6 @@ class InputHelper(object):
 
         temp =  np.asarray(img_batch)
         return temp       
-#----------------------------------------------------------------------------------------------------------------------------
 
     def batch_iter(self, x1, x2, y, video_lengths, batch_size, num_epochs, conv_model_spec, shuffle=True, is_train=True):
         """
