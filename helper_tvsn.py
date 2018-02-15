@@ -9,9 +9,6 @@ import gzip
 from random import random
 import sys
 from scipy import misc
-import imgaug as ia
-from imgaug import augmenters as iaa
-from imgaug import parameters as iap
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as pyplot
@@ -19,7 +16,9 @@ import matplotlib.pyplot as pyplot
 #sys.setdefaultencoding("utf-8")
 import numpy.linalg as linalg
 from transformations import euler_from_matrix
-
+#import imgaug as ia
+#from imgaug import augmenters as iaa
+#from imgaug import parameters as iap
 
 
 class InputHelper(object):
@@ -180,18 +179,19 @@ class InputHelper(object):
         else:
             imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_singlevw_info( batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec)
 
-        for srclists in imgpaths_src:
-            src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch))
+        crop_window=np.random.randint(0,3)
 
-        tgt_imgslist = self.load_preprocess_images_kitti(imgpaths_tgt, conv_model_spec,epoch)
+        for srclists in imgpaths_src:
+            src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch,crop_window))
+
+        tgt_imgslist = self.load_preprocess_images_kitti(imgpaths_tgt, conv_model_spec,epoch,crop_window)
 
         return src_imgslist,tgt_imgslist,tforms_imgs
 
 
 
-    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch, is_train=True):
+    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch, crop_window, is_train=True):
         img_batch = []
-        crop_window=np.random.randint(0,3)
 
         for img_path in img_paths:
             img_org = misc.imread(img_path)
@@ -225,12 +225,11 @@ class InputHelper(object):
             nums.append(int(line))
         return nums
 
-
-#selection, single vs multi?
 #normalise imgs change
 #main train file, accept and send proper args
 #what about seq imgs dict when no filter
 #make only one (filter/non filter persist)
+#pick up from filtered dicts only
 
     def get_singlevw_info_synthia(self, batch_size, sample_range, seq_num, season, seq_imgs_num, conv_model_spec ):
 
@@ -239,9 +238,10 @@ class InputHelper(object):
         tforms=[]
 
         seq_path = self.synthia_parentpath+"SYNTHIA-SEQS-%02d-" + season + "/" % (seq_num,)
-        odomlist = self.odomDict_synthia_filtered[seq_num][season]
+        odomlist = self.odomDict_synthia_filtered[seq_num][season][0]
+        indexlist = self.odomDict_synthia_filtered[seq_num][season][1]
 
-
+        assert(len(odomlist)==seq_imgs_num)
         for x in range(batch_size):
             src_img_num=np.random.randint(0,seq_imgs_num)
             radius_num=np.random.randint(1,sample_range+1)
@@ -274,8 +274,8 @@ class InputHelper(object):
             #widthwise = np.reshape(heightwise, (conv_model_spec[1][0],conv_model_spec[1][1],-1))
             tforms.append(rel_tform_vec)
 
-            src_img_path = seq_path+ 'RGB/Stereo_Left/Omni_F/' +'%06d.png' % (src_img_num,)
-            tgt_img_path = seq_path+ 'RGB/Stereo_Left/Omni_F/' +'%06d.png' % (tgt_img_num,)
+            src_img_path = seq_path+ 'RGB/Stereo_Left/Omni_F/' +'%06d.png' % (indexlist[src_img_num],)
+            tgt_img_path = seq_path+ 'RGB/Stereo_Left/Omni_F/' +'%06d.png' % (indexlist[tgt_img_num],)
             imgpaths_src.append(src_img_path)
             imgpaths_tgt.append(tgt_img_path)
 
@@ -361,7 +361,7 @@ class InputHelper(object):
         seq_idx = np.random.randint(0,lenseq)
         seq_num = seq_list[seq_idx]
         seasons = len(self.synthia_info_dict[seq_num])
-        season_idx = np.random.randint(0,season_idx)
+        season_idx = np.random.randint(0,seasons)
         season_val = list(self.synthia_info_dict[seq_num].keys())[season_idx]
         seq_imgs_num = self.img_num_dict_synthia[seq_num][season_val]
         src_imgslist = []
@@ -374,17 +374,17 @@ class InputHelper(object):
         for srclists in imgpaths_src:
             src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch))
 
-        tgt_imgslist = self.load_preprocess_images_kitti(imgpaths_tgt, conv_model_spec,epoch)
+        tgt_imgslist = self.load_preprocess_images_synthia(imgpaths_tgt, conv_model_spec,epoch)
 
         return src_imgslist,tgt_imgslist,tforms_imgs
 
     def odom_filter():
         self.odomDict_synthia_filtered = {}
         self.img_num_dict_synthia ={}
-        for seq in self.seq_list:
+        for seq in self.synthia_info_dict:
             self.odomDict_synthia_filtered[seq]={}
             self.img_num_dict_synthia[seq]={}
-            for season in self.season_list:
+            for season in self.synthia_info_dict[seq]:
                 temp_list = self.odomDict_synthia[seq][season]
                 new_list = []
                 indices = []
@@ -396,8 +396,8 @@ class InputHelper(object):
                     dest = temp_list[temp_iter] #odom element
                     rel_odom, dist = compute_rel_odom(origin,dest)
                     if(dist > 0.03):
-                        new_list.append(dist)
-                        indices.append(iterator)
+                        new_list.append(dest)
+                        indices.append(temp_iter)
                         origin = dest
                 self.img_num_dict_synthia[seq][season] = len(new_list)
                 self.odomDict_synthia_filtered[seq][season] = [new_list,indices]
@@ -405,7 +405,7 @@ class InputHelper(object):
         #clear self.odomdict original
 
 
-
+    """
     def setup_synthia(self, odompath, parentpath, rgbpath, seq_list, season_list, seqname_filepath, sempath='', depthpath='', filter_odom = True):
 
         self.odomDict_synthia = {}
@@ -421,24 +421,42 @@ class InputHelper(object):
             self.filter_odom = True
             self.odom_filter()
         self.synthia_set_seq_info(seqname_filepath)
+    """
 
+    def setup_synthia_sparse(self, odompath, parentpath, rgbpath, img_counts, sempath='', depthpath='', filter_odom = True):
 
-    def setOdomInfo_synthia(self, seq_list, season_list):
+        self.odomDict_synthia = {}
+        self.synthia_odom_path = odompath
+        self.synthia_depth_path = depthpath
+        self.synthia_rgb_path = rgbpath
+        self.synthia_sem_path = sempath
+        self.synthia_parentpath = parentpath
+        #self.seq_list = seq_list
+        #self.season_list = season_list
 
-        for seq in seq_list:
+        self.synthia_set_seq_info(img_counts)
+        self.setOdomInfo_synthia()
+
+        if filter_odom:
+            self.filter_odom = True
+            self.odom_filter()
+
+    def setOdomInfo_synthia(self):
+
+        for seq in self.synthia_info_dict:  
             self.odomDict_synthia[seq]={}
-            for season in season_list:
-                if(season in self.synthia_dict[seq]):
-                    odom_path = self.synthia_parentpath + 'SYNTHIA-SEQS-0' + str(seq) + '-' + season + '/' + self.synthia_odom_path + 'Omni_F/concat.txt'
-                    odom_list=[]
-                    for line in open(odom_path):
-                        val=line.split()
-                        val=[float(ele) for ele in val]
-                        nums = np.reshape(val, (4,4), order='F')
-                        odom_list.append(nums)
-                    self.odomDict_synthia[seq][season] = odom_list
+            for season in self.synthia_info_dict[seq]:
+                odom_path = self.synthia_parentpath + 'SYNTHIA-SEQS-0' + str(seq) + '-' + season + '/' + self.synthia_odom_path + 'Omni_F/concat.txt'
+                odom_list=[]
+                for line in open(odom_path):
+                    val=line.split()
+                    val=[float(ele) for ele in val]
+                    nums = np.reshape(val, (4,4), order='F')
+                    odom_list.append(nums)
+                self.odomDict_synthia[seq][season] = odom_list
 
-    def synthia_set_seq_info(file_path):
+    """
+    def synthia_set_seq_info_old(file_path):
         info = []
         fileobj = open(file_path)
         current = 0
@@ -456,6 +474,18 @@ class InputHelper(object):
             seq_iter +=1
         self.info_synthia = info
         self.synthia_info_dict = info_dict
+    """
+
+    def synthia_set_seq_info(img_counts):
+        info_dict= {}
+        for seq in img_counts:
+            if(len(img_counts[seq])==0):
+                continue
+            else:
+                info_dict[seq_num] = {}
+                for season in img_counts[seq]:
+                    info_dict[seq_num][season] = img_counts[seq][season]
+        self.synthia_info_dict = info_dict
 
 
     def get_num_and_season(line):
@@ -467,6 +497,19 @@ class InputHelper(object):
         seq_num = int(parts[2])
         season = parts[3]
         return seq_num, season
+
+    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch, crop_window, is_train=True):
+        img_batch = []
+
+        for img_path in img_paths:
+            img_org = misc.imread(img_path)
+            img_normalized = self.normalize_input_synthia(img_org, conv_model_spec,crop_window)
+            img_batch.append(img_normalized)
+
+        #misc.imsave('temp1.png', np.vstack([np.hstack(batch1_seq),np.hstack(batch2_seq)]))
+
+        temp =  np.asarray(img_batch)
+        return temp       
 #----------------------------------------------------------------------------------------------------------------------------
 
     def batch_iter(self, x1, x2, y, video_lengths, batch_size, num_epochs, conv_model_spec, shuffle=True, is_train=True):
@@ -501,14 +544,43 @@ class InputHelper(object):
 
     def normalize_input(self, img, conv_model_spec,crop_window):
         img = img.astype(dtype=np.float32)
-        #img = img[:, :, [2, 1, 0]] # swap channel from RGB to BGR
+        img = img[:, :, [2, 1, 0]] # swap channel from RGB to BGR
         vert_offset=100
         horz_offset=0
-        img = img[vert_offset:vert_offset+conv_model_spec[1][0],crop_window*conv_model_spec[1][1]:crop_window*conv_model_spec[1][1]+conv_model_spec[1][1]]
+        img = img[vert_offset:vert_offset+conv_model_spec[1][0], crop_window*conv_model_spec[1][1]:crop_window*conv_model_spec[1][1]+conv_model_spec[1][1]]
         img = img - conv_model_spec[0]
 
         return img
 
+    def normalize_input_synthia(self, img, conv_model_spec,crop_window):
+        img = img.astype(dtype=np.float32)
+        img = img[:, :, [2, 1, 0]] # swap channel from RGB to BGR
+        vert_offset=0
+        horz_offset=0
+        img = img[:-120, :]
+        img = img - conv_model_spec[0]
+        img = misc.imresize(np.asarray(img), conv_model_spec[1])
+        img = (img-127.5)/127.5
+        print(img)
+        #img = misc.imresize(img, (256,512)) ##224,448
+
+        #normalise
+        return img
+
+    def normalize_input_synthia_square(self, img, conv_model_spec,crop_window):
+        img = img.astype(dtype=np.float32)
+        img = img[:, :, [2, 1, 0]] # swap channel from RGB to BGR
+        vert_offset=0
+        horz_offset=0
+        img = img[:-120, :]
+        img = img - conv_model_spec[0]
+        img = misc.imresize(np.asarray(img), conv_model_spec[1])   ##make a square cropping
+        img = (img-127.5)/127.5
+        print(img)
+        #img = misc.imresize(img, (256,512)) ##224,448
+
+        #normalise
+        return img
     # Data Preparatopn
     # ==================================================
 
