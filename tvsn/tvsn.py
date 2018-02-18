@@ -387,37 +387,50 @@ class Net_tvsn(object):
 
         deconv6 = tf.nn.tanh(tf.nn.conv2d(deconv6, 3, 16, 3, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 )) #padding?
 
-    #mean sub op
+    #mean sub op !! what is that all about
+
+
 
     def tvsn_discrim():
-        feat1 =  self.conv(self.net_layers['predImg_final'],4,3,64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat1']= tf.nn.leaky_relu(batch_norm(gen_conv1,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat1'))
+        discrim_feat1a =  self.conv(self.net_layers['predImg_final'],4,3,64,name='discrim_feat1a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        self.net_layers['discrim_feat1b']= tf.nn.leaky_relu(batch_norm(discrim_feat1a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat1b'))
         
-        feat2 =  self.conv(self.net_layers['feat1'],4,64,64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat2']= tf.nn.leaky_relu(batch_norm(gen_conv2,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat2'))
+        print(self.net_layers['discrim_feat1b'].shape)
+
+        discrim_feat2a =  self.conv(self.net_layers['discrim_feat1b'],4,64,64,name='discrim_feat2a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        self.net_layers['discrim_feat2b']= tf.nn.leaky_relu(batch_norm(discrim_feat2a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat2b'))
+
+        print(self.net_layers['discrim_feat2b'].shape)
         
-        feat3 =  self.conv(self.net_layers['feat2'],4,64,64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat3']= tf.nn.leaky_relu(batch_norm(gen_conv3,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat3'))
+        discrim_feat3a =  self.conv(self.net_layers['discrim_feat2b'],4,64,64,name='discrim_feat3a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        self.net_layers['discrim_feat3b']= tf.nn.leaky_relu(batch_norm(discrim_feat3a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat3b'))
         
-        feat4 =  self.conv(self.net_layers['feat3'],4,64,128,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat4']= tf.nn.leaky_relu(batch_norm(gen_conv4,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat4'))
+        print(self.net_layers['discrim_feat3b'].shape)
+
+        discrim_feat4a =  self.conv(self.net_layers['discrim_feat3b'],4,64,128,name='discrim_feat4a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        self.net_layers['discrim_feat4b']= tf.nn.leaky_relu(batch_norm(discrim_feat4a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat4b'))
+
+        print(self.net_layers['discrim_feat4b'].shape)
         
-        feat5 =  self.conv(self.net_layers['feat4'],4,128,256,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat5']= tf.nn.leaky_relu(batch_norm(gen_conv5,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat5'))
+        discrim_feat5a =  self.conv(self.net_layers['discrim_feat4b'],4,128,256,name='discrim_feat5a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        self.net_layers['discrim_feat5b']= tf.nn.leaky_relu(batch_norm(discrim_feat5a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat5b'))
+
+        print(self.net_layers['discrim_feat5b'].shape)
              
-        feat6 =  self.conv(self.net_layers['feat5'],4,256,512,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['feat6']= tf.nn.leaky_relu(batch_norm(gen_conv6,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='feat6'))
-        out =  self.conv(self.net_layers['feat6'],4,512,1,name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=0)
+        discrim_feat6a =  self.conv(self.net_layers['discrim_feat5b'],4,256,512,name='discrim_feat6a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        self.net_layers['discrim_feat6b']= tf.nn.leaky_relu(batch_norm(discrim_feat6a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat6b'))
+        self.net_layers['discrim_out'] =  self.conv(self.net_layers['discrim_feat6'],4,512,1,name='discrim_out',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=0)
         ##out = tf.nn.sigmoid(out)
 
         ##number of classes!
         
-        bce = tf.nn.softmax_cross_entropy_with_logits(out)
+        #bce = tf.nn.softmax_cross_entropy_with_logits(out) #sigmoid!!
 
         #out -> reshape to flatten out
         ##check if this works identically in terms of output size
-        #threshold to get label?
-        concat_feats_discrim = tf.stack([feat1,feat2,feat3], name='concat_feats_discrim')
+
+        #later, stack is wrong btw
+        self.net_layers['concat_feats_discrim'] = tf.stack([self.net_layers['discrim_feat1b'],self.net_layers['discrim_feat2b'],self.net_layers['discrim_feat3b']], name='concat_feats_discrim')
 
     def _upscore_layer(self, bottom, shape,num_classes, name, debug, ksize=3, stride=2, pad_input=1, relu=1, mode='bilinear'):
 
@@ -507,8 +520,31 @@ class Net_tvsn(object):
         ref_exp_mask = tf.constant(ref_exp_mask, dtype=tf.float32)
         return ref_exp_mask
 
+    def reconstruction_loss():
+        return tf.reduce_mean(tf.abs(real_images - generated_images))
 
-
+    def lsgan_loss_generator(prob_fake_is_real):
+        return tf.reduce_mean(tf.squared_difference(prob_fake_is_real, 1))
+    
+    def lsgan_loss_discriminator(prob_real_is_real, prob_fake_is_real):
+    
+        """ 
+        Rather than compute the negative loglikelihood, a least-squares loss is
+        used to optimize the discriminators as per Equation 2 in:
+            Least Squares Generative Adversarial Networks
+            Xudong Mao, Qing Li, Haoran Xie, Raymond Y.K. Lau, Zhen Wang, and
+            Stephen Paul Smolley.
+            https://arxiv.org/pdf/1611.04076.pdf
+        Args:
+            prob_real_is_real: The discriminator's estimate that images actually
+                drawn from the real domain are in fact real.
+            prob_fake_is_real: The discriminator's estimate that generated images
+                made to look like real images are real.
+        Returns:
+            The total LS-GAN loss.
+        """
+        return (tf.reduce_mean(tf.squared_difference(prob_real_is_real, 1)) + tf.reduce_mean(tf.squared_difference(prob_fake_is_real, 0))) * 0.5
+    
     def compute_exp_reg_loss(self, pred, ref):
         l = tf.nn.softmax_cross_entropy_with_logits(
             labels=tf.reshape(ref, [-1, 2]),
@@ -517,6 +553,12 @@ class Net_tvsn(object):
 
     #def vgg_loss():
 
+    def loss_discrim():
+        #feature maps and yes/no label
+        #labels
+        #logits
+        tf.nn.sigmoid_cross_entropy_with_logits()
+
     def tvloss(generated_images):
         return tf.image.total_variation(generated_images) 
 
@@ -524,8 +566,7 @@ class Net_tvsn(object):
     def loss_gen():
         #vgg + reconstr, weighted with segmentation
 
-    def loss_discrim():
-        #feature maps and yes/no label
+    
 
         self.net_layers['gen_final_img']
     """    

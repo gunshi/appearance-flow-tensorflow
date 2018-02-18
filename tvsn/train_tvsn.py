@@ -7,35 +7,43 @@ import os
 import time
 import datetime
 import gc
-from helper_kitti import InputHelper, save_plot
+from helper_tvsn import InputHelper, save_plot
 import gzip
 from random import random
-from model_kitti_single import Net
-from model_kitti_multi import Net_MultiView
+from tvsn import Net_tvsn
 from scipy.misc import imsave
+import sys
 # Parameters
 # ==================================================
 
 tf.flags.DEFINE_integer("embedding_dim", 1000, "Dimensionality of character embedding (default: 300)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
+tf.flags.DEFINE_float("exp_reg_weight", 0.0, "L2 regularizaion lambda (default: 0.0)")
+
+tf.flags.DEFINE_string("dataset_to_use", "SYNTHIA", "training folder")
 
 #kitti paths
 tf.flags.DEFINE_string("kitti_odom_path", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/poses/", "training folder")
 tf.flags.DEFINE_string("kitti_parentpath", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/sequences/", "training folder")
 
 #synthia paths
-tf.flags.DEFINE_string("synthia_prefix", "/", "training folder")
+tf.flags.DEFINE_string("synthia_parentpath", "/home/gunshi/Downloads/synthia/", "training folder")
+tf.flags.DEFINE_string("synthia_configpath", "SYNTHIA_data.txt", "training folder")
+tf.flags.DEFINE_string("synthia_frame_info_path", "FRAMES_SYNTHIA.txt", "training folder")
 tf.flags.DEFINE_string("synthia_odom_path", "CameraParams/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_rgb_path", "RGB/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_semseg_path", "GT/COLOR/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_depth_path", "Depth/Stereo_Left/", "training folder")
+tf.flags.DEFINE_string("synthia_output_save_path", "/home/gunshi/Downloads/network_outputs/", "training folder")
+tf.flags.DEFINE_string("synthia_image_save_path", "/home/gunshi/Downloads/network_outputs/imgs/", "training folder")
+
 
 tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)")
 tf.flags.DEFINE_string("name", "result", "prefix names of the output files(default: result)")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 30, "Batch Size (default: 10)")
+tf.flags.DEFINE_integer("batch_size", 15, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("sample_range", 5, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
@@ -46,18 +54,18 @@ tf.flags.DEFINE_float("lr", 0.0001, "learning-rate(default: 0.00001)")
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
-tf.flags.DEFINE_string("summaries_dir", "./../summaries/", "Summary storage")
+tf.flags.DEFINE_string("summaries_dir", "/home/gunshi/Downloads/network_outputs/summaries/", "Summary storage")
 
 #Model Parameters
-tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
+tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
-tf.flags.DEFINE_integer("numseqs_synthia", 6, "kitti sequences")
 tf.flags.DEFINE_integer("batches_train", 6000 , "batches for train")
 tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
 tf.flags.DEFINE_boolean("multi_view_training", False, "Training ConvNet (Default: False)")
 
 FLAGS = tf.flags.FLAGS
+#FLAGS(sys.argv)
 FLAGS._parse_flags()
 print("\nParameters:")
 for attr, value in sorted(FLAGS.__flags.items()):
@@ -72,22 +80,23 @@ if FLAGS.kitti_parentpath==None:
     print("Input Files List is empty. use --training_file_path argument.")
     exit()
 
-seqs=[ i for i in range(0,FLAGS.numseqs) ]
 
-#kitti------------------------------------------
-seqstrain=seqs[0:10]
-seqstest=seqs[10:]
-imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200,11:920}
-
-#synthia----------------------------------------
-synthia_seasons_train = ['','','']
-synthia_test = [6]
-synthia_train = [1,2,3,4,5]
-synthia_all = [i for i in range(0,FLAGS.numseqs_synthia)]
-imgs_counts={}
 
 inpH = InputHelper()
-inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)
+
+
+if(FLAGS.dataset_to_use=='KITTI'):
+    seqs=[ i for i in range(0,FLAGS.numseqs) ]
+    seqstrain = seqs[0:10]
+    seqstest = seqs[10:]
+    imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200,11:920}
+    inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)
+
+if(FLAGS.dataset_to_use=='SYNTHIA'):
+    seqstest = [4]
+    seqstrain = [1,2]
+    imgs_counts = {1:{'DAWN':1451},2:{'FALL':742},4:{'SUMMER':901, 'SPRING':959},5:{},6:{}}
+    inpH.setup_synthia_sparse(FLAGS.synthia_odom_path, FLAGS.synthia_parentpath, FLAGS.synthia_rgb_path, imgs_counts)
 
 
 # Training
@@ -104,23 +113,30 @@ with tf.Graph().as_default():
     print("started session")
     with sess.as_default():
         if(FLAGS.multi_view_training):
-            convModel = Net_MultiView(
+            convModel = Net_tvsn(
                  FLAGS.batch_size,
-                 FLAGS.conv_net_training)
+                 FLAGS.conv_net_training,
+                 FLAGS.exp_reg_weight)
         else:
 
-            convModel = Net(
+            convModel = Net_tvsn(
              FLAGS.batch_size,
-             FLAGS.conv_net_training)
+             FLAGS.conv_net_training,
+             FLAGS.exp_reg_weight)
 
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
         #learning_rate=tf.train.exponential_decay(1e-5, global_step, sum_no_of_batches*5, 0.95, staircase=False, name=None)
-        optimizer = tf.train.AdamOptimizer(FLAGS.lr)
+        optimizer1 = tf.train.AdamOptimizer(FLAGS.lr)
+
+        optimizer2 = tf.train.AdamOptimizer(FLAGS.lr)
+
         print("initialized Net object")
 
     grads_and_vars=optimizer.compute_gradients(convModel.loss)
-    tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
+    tr_op_set_gen = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
+    tr_op_set_dis = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
+
     print("defined training_ops")
     # keep track of gradient values and sparsity (optional)
     grad_summaries = []
@@ -134,7 +150,7 @@ with tf.Graph().as_default():
     print("defined gradient summaries")
     # Output directory for models and summaries
     timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join("./../", "runs", FLAGS.name))
+    out_dir = os.path.abspath(os.path.join("/home/gunshi/Downloads/network_outputs/", "runs", FLAGS.name))
     print("Writing to {}\n".format(out_dir))
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
@@ -192,10 +208,10 @@ with tf.Graph().as_default():
             outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
             for i in range(len(outputs)):
-                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
-                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
                 for j in range(len(src_batch)):
-                    imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
+                    imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
                 img_num+=1
         else:
              _, step, loss, summary = sess.run([tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
@@ -212,13 +228,19 @@ with tf.Graph().as_default():
                         convModel.aux_imgs: src_batch[1],
                         convModel.tgt_imgs: tgt_batch,
                         convModel.tform: tform_batch[0],
-                        convModel.tform_aux: tform_batch[1] }
+                        convModel.tform_aux: tform_batch[1] ,
+                        convModel.keep_prob: FLAGS.dropout_keep_prob,
+                        convModel.is_train:False
+                        }
 
         else:
 
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.tgt_imgs: tgt_batch,
-                        convModel.tform: tform_batch[0] }
+                        convModel.tform: tform_batch[0], 
+                        convModel.keep_prob: FLAGS.dropout_keep_prob,
+                        convModel.is_train:False
+                        }
 
 
 
@@ -228,6 +250,17 @@ with tf.Graph().as_default():
 
         return summary, loss
 
+    def get_batch_appropriate_train(seqstrain, is_train, imgs_counts, spec, nn, multi_view_training):
+        if(FLAGS.dataset_to_use=='SYNTHIA'):
+            return inpH.getSynthiaBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,is_train, spec,nn, multi_view_training)
+        else:
+            return inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,is_train, imgs_counts, spec,nn, FLAGS.multi_view_training)
+    
+    def get_batch_appropriate_test(seqstest, is_train, imgs_counts, spec, nn, multi_view_training):
+        if(FLAGS.dataset_to_use=='SYNTHIA'):
+            return inpH.getSynthiaBatch(FLAGS.batch_size,FLAGS.sample_range,seqstest,is_train, spec, nn, multi_view_training)
+        else:
+            return inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstest,is_train, imgs_counts, spec, nn, FLAGS.multi_view_training)
 
     start_time = time.time()
     train_loss, val_loss = [], []
@@ -242,7 +275,7 @@ with tf.Graph().as_default():
         train_epoch_loss=0.0
         for kk in range(FLAGS.batches_train):
             print(str(kk))
-            src_batch, tgt_batch, tform_batch = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstrain,True, imgs_counts, convModel.spec,nn, FLAGS.multi_view_training)
+            src_batch, tgt_batch, tform_batch = get_batch_appropriate_train(seqstrain,True, imgs_counts, convModel.spec,nn, FLAGS.multi_view_training)
             if len(tform_batch)<1:
                 continue
             summary, train_batch_loss =train_step(src_batch, tgt_batch, tform_batch, kk, nn, FLAGS.multi_view_training)
@@ -257,7 +290,7 @@ with tf.Graph().as_default():
         print("\nEvaluation:")
 
         for kk in range(FLAGS.batches_test):
-            src_dev_b, tgt_dev_b, tform_dev_b = inpH.getKittiBatch(FLAGS.batch_size,FLAGS.sample_range,seqstest,True, imgs_counts, convModel.spec, nn, FLAGS.multi_view_training)
+            src_dev_b, tgt_dev_b, tform_dev_b = get_batch_appropriate_test(seqstest,True, imgs_counts, convModel.spec, nn, FLAGS.multi_view_training)
 
             summary,  val_batch_loss = dev_step(src_dev_b, tgt_dev_b, tform_dev_b, kk ,nn, FLAGS.multi_view_training)
 
