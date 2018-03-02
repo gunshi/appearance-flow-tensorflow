@@ -195,7 +195,7 @@ class InputHelper(object):
 
 
 
-    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch,crop_window is_train=True):
+    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch,crop_window, is_train=True):
         img_batch = []
 
         for img_path in img_paths:

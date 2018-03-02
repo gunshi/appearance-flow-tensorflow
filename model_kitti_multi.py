@@ -6,7 +6,7 @@ import numpy as np
 from scipy import misc
 from bilinear_sampler import bilinear_sampler
 import math
-from tf.contrib.resampler import resampler
+#from tf.contrib.resampler import resampler
 
 
 class Net_MultiView(object):

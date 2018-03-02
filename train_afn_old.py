@@ -129,10 +129,10 @@ with tf.Graph().as_default():
     checkpoint_prefix = os.path.join(checkpoint_dir, "model")
     if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-    current_path = os.getcwd()
+    #current_path = os.getcwd()
     #imgdir_path=os.path.join(current_path,'imgs')
-    if not os.path.exists(imgdir_path):
-        os.makedirs(imgdir_path)
+    #if not os.path.exists(imgdir_path):
+        #os.makedirs(imgdir_path)
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
 
     # Initialize all variables
