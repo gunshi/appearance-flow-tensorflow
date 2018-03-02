@@ -184,18 +184,19 @@ class InputHelper(object):
         else:
             imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_singlevw_info( batch_size, sample_range, seq_num, seq_imgs_num, conv_model_spec)
 
-        for srclists in imgpaths_src:
-            src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch))
+	crop_window=np.random.randint(0,3)
 
-        tgt_imgslist = self.load_preprocess_images_kitti(imgpaths_tgt, conv_model_spec,epoch)
+        for srclists in imgpaths_src:
+            src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch,crop_window))
+
+        tgt_imgslist = self.load_preprocess_images_kitti(imgpaths_tgt, conv_model_spec,epoch, crop_window)
 
         return src_imgslist,tgt_imgslist,tforms_imgs
 
 
 
-    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch, is_train=True):
+    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch,crop_window is_train=True):
         img_batch = []
-        crop_window=np.random.randint(0,3)
 
         for img_path in img_paths:
             img_org = misc.imread(img_path)

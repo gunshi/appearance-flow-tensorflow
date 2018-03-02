@@ -21,8 +21,8 @@ tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (defau
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
 
 tf.flags.DEFINE_string("dataset_to_use", "", "training folder")
-tf.flags.DEFINE_string("kitti_odom_path", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/poses/", "training folder")
-tf.flags.DEFINE_string("kitti_parentpath", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/sequences/", "training folder")
+tf.flags.DEFINE_string("kitti_odom_path", "/scratch/tushar.vaidya/kitti/poses/", "training folder")
+tf.flags.DEFINE_string("kitti_parentpath", "/scratch/tushar.vaidya/kitti/sequences/", "training folder")
 tf.flags.DEFINE_string("synthia_parentpath", "", "training folder")
 tf.flags.DEFINE_string("synthia_configpath", "", "training folder")
 
@@ -41,7 +41,7 @@ tf.flags.DEFINE_float("lr", 0.0001, "learning-rate(default: 0.00001)")
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
-tf.flags.DEFINE_string("summaries_dir", "./../summaries/", "Summary storage")
+tf.flags.DEFINE_string("summaries_dir", "/scratch/tushar.vaidya/afn/outputs/summaries/", "Summary storage")
 
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
@@ -72,7 +72,7 @@ seqstrain=seqs[0:10]
 seqstest=seqs[10:]
 
 #hard coded for now, add method to compute TODO
-imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200,11:920}
+imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200}#,11:920}
 inpH = InputHelper()
 inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)
 
@@ -121,7 +121,7 @@ with tf.Graph().as_default():
     print("defined gradient summaries")
     # Output directory for models and summaries
     timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join("./../", "runs", FLAGS.name))
+    out_dir = os.path.abspath(os.path.join("/scratch/tushar.vaidya/afn/outputs/", "runs", FLAGS.name))
     print("Writing to {}\n".format(out_dir))
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
@@ -130,7 +130,7 @@ with tf.Graph().as_default():
     if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
     current_path = os.getcwd()
-    imgdir_path=os.path.join(current_path,'imgs')
+    #imgdir_path=os.path.join(current_path,'imgs')
     if not os.path.exists(imgdir_path):
         os.makedirs(imgdir_path)
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
@@ -179,10 +179,10 @@ with tf.Graph().as_default():
             outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
             for i in range(len(outputs)):
-                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
-                imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
+                imsave('/scratch/tushar.vaidya/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
+                imsave('/scratch/tushar.vaidya/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
                 for j in range(len(src_batch)):
-                    imsave('imgs/'+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
+                    imsave('/scratch/tushar.vaidya/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
                 img_num+=1
         else:
              _, step, loss, summary = sess.run([tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
