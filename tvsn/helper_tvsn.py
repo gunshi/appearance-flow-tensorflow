@@ -225,14 +225,16 @@ class InputHelper(object):
         imgpaths_src=[]
         imgpaths_tgt=[]
         tforms=[]
-
-        seq_path = self.synthia_parentpath+"SYNTHIA-SEQS-%02d-" + season + "/" % (seq_num,)
+	print(season)
+	print(seq_num)
+        seq_path = self.synthia_parentpath+'SYNTHIA-SEQS-{:02}-{}/'
+	seq_path= seq_path.format(seq_num,season)
         odomlist = self.odomDict_synthia_filtered[seq_num][season][0]
         indexlist = self.odomDict_synthia_filtered[seq_num][season][1]
 
         assert(len(odomlist)==seq_imgs_num)
         for x in range(batch_size):
-            src_img_num=np.random.randint(0,seq_imgs_num)
+            src_img_num=np.random.randint(1,seq_imgs_num)
             radius_num=np.random.randint(1,sample_range+1)
             odom_src_4x4=odomlist[src_img_num]
             if random()>0.5:
@@ -281,7 +283,7 @@ class InputHelper(object):
 
         for x in range(batch_size):
 
-            src_img_num = np.random.randint(0,seq_imgs_num)
+            src_img_num = np.random.randint(1,seq_imgs_num)
             radius_num_a = np.random.randint(1,int(sample_range/2)+1)
             radius_num_b = np.random.randint(1,int(sample_range/2)+1)
             odom_src = odomlist[src_img_num]
@@ -356,14 +358,15 @@ class InputHelper(object):
         src_imgslist = []
 
         if(is_multi_view):
-            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_multivw_info( batch_size, sample_range, seq_num, season_val, seq_imgs_num, conv_model_spec)
+            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_multivw_info_synthia( batch_size, sample_range, seq_num, season_val, seq_imgs_num, conv_model_spec)
         else:
-            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_singlevw_info( batch_size, sample_range, seq_num, season_val, seq_imgs_num, conv_model_spec)
-
+            imgpaths_src, tforms_imgs, imgpaths_tgt = self.get_singlevw_info_synthia( batch_size, sample_range, seq_num, season_val, seq_imgs_num, conv_model_spec)
+	
+	crop_window=np.random.randint(0,3)
         for srclists in imgpaths_src:
-            src_imgslist.append(self.load_preprocess_images_kitti(srclists, conv_model_spec,epoch))
+            src_imgslist.append(self.load_preprocess_images_synthia(srclists, conv_model_spec,crop_window,epoch))
 
-        tgt_imgslist = self.load_preprocess_images_synthia(imgpaths_tgt, conv_model_spec,epoch)
+        tgt_imgslist = self.load_preprocess_images_synthia(imgpaths_tgt, conv_model_spec,crop_window,epoch)
 
         return src_imgslist,tgt_imgslist,tforms_imgs
 
@@ -486,7 +489,7 @@ class InputHelper(object):
         season = parts[3]
         return seq_num, season
 
-    def load_preprocess_images_kitti(self, img_paths, conv_model_spec, epoch, crop_window, is_train=True):
+    def load_preprocess_images_synthia(self, img_paths, conv_model_spec, epoch, crop_window, is_train=True):
         img_batch = []
 
         for img_path in img_paths:
@@ -501,7 +504,7 @@ class InputHelper(object):
 
     def batch_iter(self, x1, x2, y, video_lengths, batch_size, num_epochs, conv_model_spec, shuffle=True, is_train=True):
         """
-        Generates a batch iterator for a dataset.
+        #Generates a batch iterator for a dataset.
         """
         data_size = len(y)
         temp = int(data_size/batch_size)

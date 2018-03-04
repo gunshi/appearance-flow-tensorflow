@@ -94,12 +94,12 @@ class Net_tvsn(object):
         if self.is_train:
             net_layers['de_fc1'] = tf.nn.dropout(net_layers['de_fc1'], self.keep_prob)
         
-        net_layers['de_fc2'] = self.fc(net_layers['view_concat'], 2048 , 2048, name='de_fc2', relu = 1)
+        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1)
         
         if self.is_train:
             net_layers['de_fc2'] = tf.nn.dropout(net_layers['de_fc2'], self.keep_prob)
 
-        net_layers['de_fc3'] = self.fc(net_layers['view_concat'], 2048 , 512*4*4, name='de_fc3', relu = 1)
+        net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*4, name='de_fc3', relu = 1)
         net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 4, 512], name='de_fc3_rs')
        
 
@@ -181,12 +181,14 @@ class Net_tvsn(object):
         
         net_layers['de_fc1'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc1'], self.keep_prob) , lambda: net_layers['de_fc1'])
         
-        net_layers['de_fc2'] = self.fc(net_layers['view_concat'], 2048 , 2048, name='de_fc2', relu = 1)
+        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1)
         
         net_layers['de_fc2'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc2'], self.keep_prob) , lambda: net_layers['de_fc2'])
 
-        net_layers['de_fc3'] = self.fc(net_layers['view_concat'], 2048 , 512*4*7, name='de_fc3', relu = 1)
-        net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 7, 512], name='de_fc3_rs')
+	print(net_layers['de_fc2'].shape)
+        net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*7, name='de_fc3', relu = 1)
+        print(net_layers['de_fc3'].shape)
+	net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 7, 512], name='de_fc3_rs')
        
 
 
