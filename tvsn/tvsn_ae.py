@@ -6,6 +6,7 @@ from scipy import misc
 from bilinear_sampler import bilinear_sampler
 import math
 from tensorflow.contrib.layers import batch_norm
+#from tensorflow.contrib.resampler import resampler
 import layers
 
 
@@ -65,6 +66,338 @@ class Net_tvsn(object):
         return tf.nn.max_pool(input_, ksize=[1,3,3,1], strides=[1,2,2,1], padding=padding, name= name)
 
 
+    def build_resnet_block(inputres, dim, name="resnet", padding="REFLECT"):
+        """Build a single block of resnet.
+
+        :param inputres: inputres
+        :param dim: dim
+        :param name: name
+        :param padding: for tensorflow version use REFLECT; for pytorch version use
+         CONSTANT
+        :return: a single block of resnet.
+        """
+        with tf.variable_scope(name):
+            out_res = tf.pad(inputres, [[0, 0], [1, 1], [
+                1, 1], [0, 0]], padding)
+            out_res = layers.general_conv2d(
+                out_res, dim, 3, 3, 1, 1, 0.02, "VALID", "c1")
+            out_res = tf.pad(out_res, [[0, 0], [1, 1], [1, 1], [0, 0]], padding)
+            out_res = layers.general_conv2d(
+                out_res, dim, 3, 3, 1, 1, 0.02, "VALID", "c2", do_relu=False)
+
+            return tf.nn.relu(out_res + inputres)
+
+    def encdec_resnet(inputs, network_id, num_separate_layers, num_no_skip_layers):
+        """
+
+        The generator consists of three parts: Conv, ResNet blocks and DeConv.
+        in the middle blocks.
+
+        Args:
+            inputs: a tensor as the input image.
+            network_id: an integer as the id of the network (1-4).
+            num_separate_layers: an integer as the number of separate layers.
+            num_no_skip_layers: a dummy variable which is not used.
+        """
+        fl_ks = 7  # kernel size of the first and last layer
+        ks = 3
+        padding = "CONSTANT"
+
+        _num_generator_filters = 32
+        reuse = False
+
+        #scope, reuse = get_scope_and_reuse_conv(network_id)
+        scope = 'resnet_conv'
+        with tf.variable_scope(scope):
+            if reuse is True:
+                tf.get_variable_scope().reuse_variables()
+            pad_input = tf.pad(
+                inputs, [[0, 0], [ks, ks], [ks, ks], [0, 0]], padding)
+
+            o_c1 = layers.general_conv2d(
+                pad_input, _num_generator_filters, fl_ks, fl_ks, 1, 1, 0.02, name="c1")  # noqa
+            
+            o_c2 = layers.general_conv2d(
+                o_c1, _num_generator_filters * 2, ks, ks, 2, 2, 0.02, "SAME", "c2")  # noqa
+            
+            o_c3 = layers.general_conv2d(
+                o_c2, _num_generator_filters * 4, ks, ks, 2, 2, 0.02, "SAME", "c3")  # noqa
+
+        in_t = o_c3
+        channel_factor = 4 
+        for i in range(3):
+            scope = 'resnet_middle'
+            #scope, reuse = get_scope_and_reuse_resnet(
+                #network_id, i, 9, num_separate_layers)
+            with tf.variable_scope(scope):
+                if reuse is True:
+                    tf.get_variable_scope().reuse_variables()
+                out = build_resnet_block(
+                    in_t, _num_generator_filters * channel_factor, 'r{}'.format(i),
+                    padding)
+                in_t = out
+                channel_factor = channel_factor*2
+                in_t = layers.general_conv2d(
+                    out, _num_generator_filters * channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c"+str(i))  # noqa
+
+
+        #add conv last conv here (2 or 1)
+
+        # add bottleneck processing
+
+
+
+
+        #deconv or resize + conv1x1
+
+        #scope, reuse = get_scope_and_reuse_deconv(network_id)
+        scope = 'resnet_deconv'
+        with tf.variable_scope(scope):
+            if reuse is True:
+                tf.get_variable_scope().reuse_variables()
+            
+            o_c4 = layers.general_deconv2d(
+                out, [BATCH_SIZE, 128, 128, _num_generator_filters *
+                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                "SAME", "c4")
+            
+            o_c5 = layers.general_deconv2d(
+                o_c4, [BATCH_SIZE, 256, 256, _num_generator_filters],
+                _num_generator_filters, ks, ks, 2, 2, 0.02,
+                "SAME", "c5")
+            
+
+            o_c6 = layers.general_conv2d(o_c5, IMG_CHANNELS, fl_ks, fl_ks,
+                                         1, 1, 0.02, "SAME", "c6",
+                                         do_norm=False, do_relu=False)
+
+
+            #probably need three more deconvs here
+
+            out_gen = tf.nn.tanh(o_c6, "t1")
+
+        return out_gen
+
+
+    def generator_resnet_9blocks(inputs, network_id, num_separate_layers, num_no_skip_layers):
+        """Build 9 blocks of ResNet as generator.
+
+        The generator consists of three parts: Conv, ResNet blocks and DeConv.
+        Conv and DeConv are not shared. The ResNet blocks are partially shared
+        in the middle blocks.
+
+        Args:
+            inputs: a tensor as the input image.
+            network_id: an integer as the id of the network (1-4).
+            num_separate_layers: an integer as the number of separate layers.
+            num_no_skip_layers: a dummy variable which is not used.
+        """
+        fl_ks = 7  # kernel size of the first and last layer
+        ks = 3
+        padding = "CONSTANT"
+
+        _num_generator_filters = 32
+        reuse = False
+
+        #scope, reuse = get_scope_and_reuse_conv(network_id)
+        scope = 'resnet_conv'
+        with tf.variable_scope(scope):
+            if reuse is True:
+                tf.get_variable_scope().reuse_variables()
+            pad_input = tf.pad(
+                inputs, [[0, 0], [ks, ks], [ks, ks], [0, 0]], padding)
+
+            o_c1 = layers.general_conv2d(
+                pad_input, _num_generator_filters, fl_ks, fl_ks, 1, 1, 0.02, name="c1")  # noqa
+            
+            o_c2 = layers.general_conv2d(
+                o_c1, _num_generator_filters * 2, ks, ks, 2, 2, 0.02, "SAME", "c2")  # noqa
+            
+            o_c3 = layers.general_conv2d(
+                o_c2, _num_generator_filters * 4, ks, ks, 2, 2, 0.02, "SAME", "c3")  # noqa
+
+        in_t = o_c3
+        for i in range(9):
+            scope = 'resnet_middle'
+            #scope, reuse = get_scope_and_reuse_resnet(
+                network_id, i, 9, num_separate_layers)
+            with tf.variable_scope(scope):
+                if reuse is True:
+                    tf.get_variable_scope().reuse_variables()
+                out = build_resnet_block(
+                    in_t, _num_generator_filters * 4, 'r{}'.format(i),
+                    padding)
+                in_t = out
+
+        #scope, reuse = get_scope_and_reuse_deconv(network_id)
+        scope = 'resnet_deconv'
+        with tf.variable_scope(scope):
+            if reuse is True:
+                tf.get_variable_scope().reuse_variables()
+            
+            o_c4 = layers.general_deconv2d(
+                out, [BATCH_SIZE, 128, 128, _num_generator_filters *
+                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                "SAME", "c4")
+            
+            o_c5 = layers.general_deconv2d(
+                o_c4, [BATCH_SIZE, 256, 256, _num_generator_filters],
+                _num_generator_filters, ks, ks, 2, 2, 0.02,
+                "SAME", "c5")
+            
+            o_c6 = layers.general_conv2d(o_c5, IMG_CHANNELS, fl_ks, fl_ks,
+                                         1, 1, 0.02, "SAME", "c6",
+                                         do_norm=False, do_relu=False)
+
+            out_gen = tf.nn.tanh(o_c6, "t1")
+
+        return out_gen
+
+
+    def get_encoder_layer_specs():
+        """Return number of output channels of each encoder layer."""
+        return [
+            # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
+            32 * 2,
+            # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
+            32 * 4,
+            # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
+            32 * 8,
+            # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
+            32 * 8,
+            # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
+            32 * 16,
+            # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
+            32 * 16,
+        ]
+
+
+    def get_decoder_layer_specs():
+        """Get number of output channels and dropout ratio in decoder."""
+        return [
+            # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 *
+            # 2]
+            (32 * 16, 0.5),
+            # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8
+            # * 2]
+            (32 * 8, 0.0),
+            # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 *
+            # 2]
+            (32 * 8, 0.0),
+            # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 *
+            # 2]
+            (32 * 4, 0.0),
+            # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 *
+            # 2]
+            (32 * 2, 0.0),
+            # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf
+            # * 2]
+            (32, 0.0),
+        ]
+
+    def encoder_decoder(inputs, tforms):
+        """The autoencoder network architecture from pix2pix.
+
+        Args:
+            inputs: a tensor as the input to the encoder decoder.
+            network_id: an integer as the index of the network.
+                If network_id == 1, it is the encoder_deoder of the first domain.
+                if network_id == 2, it is the encoder_deoder of the second domain.
+                if network_id == 3, it is the encoder_deoder that reuses network 2.
+                if network_id == 4, it is the encoder_deoder that reuses network 1.
+            num_separate_layers: an integer as the number of separate layers.
+            num_no_skip_layers: an integer as the number of layers without skip
+                connection.
+
+        Return:
+            A tensor as the output of the encoder_decoder.
+        """
+        all_layers = []
+        reuse=False
+        #scope, reuse = get_scope_and_reuse_encoder(
+            #network_id, 0, num_separate_layers)
+        scope='encoder'
+        with tf.variable_scope(scope):
+            if reuse is True:
+                tf.get_variable_scope().reuse_variables()
+            output = layers.conv(inputs, 32, stride=2)
+            all_layers.append(output)
+
+        layer_specs = get_encoder_layer_specs()
+
+        total_num_layers = len(layer_specs) + 1
+        for i, out_channels in enumerate(layer_specs):
+            #scope, reuse = get_scope_and_reuse_encoder(
+                #network_id, (i + 1), num_separate_layers)
+            with tf.variable_scope(scope):
+                if reuse is True:
+                    tf.get_variable_scope().reuse_variables()
+                rectified = layers.p2p_lrelu(all_layers[-1], 0.2) ##################################swap order with batch norm later
+                convolved = layers.conv(rectified, out_channels, stride=2)
+                output = layers.batchnorm(convolved)
+                print(i)
+                print(output.shape)
+                all_layers.append(output)
+
+
+        """
+
+        ##add bottleneck
+        net_layers['fc_conv6'] = self.fc(net_layers['Convolution6'], 4*4*512 , 2048, name='fc_conv6', relu = 1)
+        net_layers['view_fc1'] = self.fc(self.tform, 6 , 128, name='view_fc1', relu = 1)
+        net_layers['view_fc2'] = self.fc(view_fc1, 128 , 256, name='view_fc2', relu = 1)
+        net_layers['view_concat'] = tf.concat([net_layers['fc_conv6'], net_layers['view_fc2']], 0) ##is this 0 dimension correct?
+
+        net_layers['de_fc1'] = self.fc(net_layers['view_concat'], 2304 , 2048, name='de_fc1', relu = 1)
+        
+        if self.is_train:
+            net_layers['de_fc1'] = tf.nn.dropout(net_layers['de_fc1'], self.keep_prob)
+        
+        net_layers['de_fc2'] = self.fc(net_layers['view_concat'], 2048 , 2048, name='de_fc2', relu = 1)
+        
+        if self.is_train:
+            net_layers['de_fc2'] = tf.nn.dropout(net_layers['de_fc2'], self.keep_prob)
+
+
+        """ 
+        print('now decoding')
+        # decoder part
+        layer_specs = get_decoder_layer_specs()
+        for i, (out_channels, dropout) in enumerate(layer_specs):
+            current_layer = total_num_layers - i - 1
+            #scope, reuse = get_scope_and_reuse_decoder(
+                #network_id, current_layer, num_separate_layers)
+            scope=''
+            with tf.variable_scope(scope):
+                if reuse is True:
+                    tf.get_variable_scope().reuse_variables()
+
+                
+                input = all_layers[-1]
+               
+                rectified = tf.nn.relu(input)
+                output = layers.deconv(rectified, out_channels)
+                output = layers.batchnorm(output)
+                print(output.shape)
+                if dropout > 0.0:
+                    output = tf.nn.dropout(output, keep_prob=1 - dropout)
+                all_layers.append(output)
+
+        #scope, reuse = get_scope_and_reuse_decoder(
+            #network_id, 0, num_separate_layers)
+        scope=''
+        with tf.variable_scope(scope):
+            if reuse is True:
+                tf.get_variable_scope().reuse_variables()
+            input = all_layers[-1]
+            rectified = tf.nn.relu(input)
+            output = layers.deconv(rectified, 3)
+            output = tf.tanh(output)
+            all_layers.append(output)
+
+        return all_layers[-1]
+
+
     def doafn():
 
         #input is mean subtracted, normalised to -1 to 1
@@ -76,10 +409,15 @@ class Net_tvsn(object):
 
         # Conv-Layers
         net_layers['Convolution1'] = self.conv(net_layers['input_imgs'], 5, 3 , 16, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
+
         net_layers['Convolution2'] = self.conv(net_layers['Convolution1'], 5, 16 , 32, name= 'Convolution2', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
+
         net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 5, 32 , 64, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
+
         net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 64 , 128, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+
         net_layers['Convolution5'] = self.conv(net_layers['Convolution4'], 3, 128 , 256, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+
         net_layers['Convolution6'] = self.conv(net_layers['Convolution4'], 3, 256 , 512, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
 
 
@@ -94,18 +432,17 @@ class Net_tvsn(object):
         if self.is_train:
             net_layers['de_fc1'] = tf.nn.dropout(net_layers['de_fc1'], self.keep_prob)
         
-        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1)
+        net_layers['de_fc2'] = self.fc(net_layers['view_concat'], 2048 , 2048, name='de_fc2', relu = 1)
         
         if self.is_train:
             net_layers['de_fc2'] = tf.nn.dropout(net_layers['de_fc2'], self.keep_prob)
 
-        net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*4, name='de_fc3', relu = 1)
+        net_layers['de_fc3'] = self.fc(net_layers['view_concat'], 2048 , 512*4*4, name='de_fc3', relu = 1)
         net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 4, 512], name='de_fc3_rs')
        
 
         deconv1_x2 = tf.image.resize_bilinear(net_layers['de_fc3_rs'], [8, 8])
         net_layers['deconv1'] = self.conv(deconv1_x2, 3, 512 , 256, name= 'deconv1', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
-
 
         deconv2_x2 = tf.image.resize_bilinear(net_layers['deconv1'], [16, 16])
         net_layers['deconv2'] = self.conv(deconv2_x2, 3, 256 , 128, name= 'deconv2', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
@@ -120,21 +457,15 @@ class Net_tvsn(object):
         net_layers['deconv5'] = self.conv(deconv5_x2, 5, 32 , 16, name= 'deconv5', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
         
         deconv6_x2 = tf.image.resize_bilinear(net_layers['deconv5'], [256, 256])
-        net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 2, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
+        net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 3, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
 
-
-        #remap using bilinear on (flow(deconv6) and input_imgs) to get predImg
-        net_layers['predImg'] = bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
+        #do something additonal to the image here?
+        #batch norm?
 
         deconv_x2_mask = tf.image.resize_bilinear(net_layers['deconv5'], [256, 256])
-
-        #net_layers['deconv_mask'] = tf.nn.sigmoid(self.conv(deconv_x2_mask, 5, 16 , 2, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
-
         net_layers['deconv_mask'] = self.conv(deconv_x2_mask, 5, 16 , 2, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
 
         self.net_layers = net_layers
-
-        #resampler(self.input_imgs,net_layers['flow_aux'],name='resampler')
 
 
     def doafn_aspect_wide(self):
@@ -181,14 +512,12 @@ class Net_tvsn(object):
         
         net_layers['de_fc1'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc1'], self.keep_prob) , lambda: net_layers['de_fc1'])
         
-        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1)
+        net_layers['de_fc2'] = self.fc(net_layers['view_concat'], 2048 , 2048, name='de_fc2', relu = 1)
         
         net_layers['de_fc2'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc2'], self.keep_prob) , lambda: net_layers['de_fc2'])
 
-	print(net_layers['de_fc2'].shape)
-        net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*7, name='de_fc3', relu = 1)
-        print(net_layers['de_fc3'].shape)
-	net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 7, 512], name='de_fc3_rs')
+        net_layers['de_fc3'] = self.fc(net_layers['view_concat'], 2048 , 512*4*7, name='de_fc3', relu = 1)
+        net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 7, 512], name='de_fc3_rs')
        
 
 
@@ -228,202 +557,6 @@ class Net_tvsn(object):
         self.net_layers = net_layers
 
         #resampler(self.input_imgs,net_layers['flow_aux'],name='resampler')
-
-
-    def afn_old(self):
-
-        debug=True
-        net_layers={}
-        #placeholder for a random set of <batch_size> images of fixed size -- 224,224
-        self.input_imgs = tf.placeholder(tf.float32, shape = [None, 224, 224, 3], name = "input_imgs")
-        self.input_batch_size = tf.shape(self.input_imgs)[0]  # Returns a scalar `tf.Tensor`
-        self.tform = tf.placeholder(tf.float32, shape = [None, 224, 224, 6], name = "tform")
-        net_layers['input_stack'] = tf.concat([self.input_imgs, self.tform], 3)
-
-        #mean is already subtracted in helper.py as part of preprocessing
-        # Conv-Layers
-
-        net_layers['Convolution1'] = self.conv(net_layers['input_stack'], 3, 9 , 32, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        net_layers['Convolution2'] = self.conv(net_layers['Convolution1'], 3, 32 , 64, name= 'Convolution2', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 3, 64 , 128, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 128 , 256, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        net_layers['Convolution5'] = self.conv(net_layers['Convolution4'], 3, 256 , 512, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-
-        #deconv
-        net_layers['deconv1'] = self._upscore_layer(net_layers['Convolution5'], shape=None,
-                                           num_classes=512,
-                                           debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
-
-        net_layers['deconv2'] = self._upscore_layer(net_layers['deconv1'], shape=None,
-                                           num_classes=256,
-                                           debug=debug, name='deconv2', ksize=3, stride=2, pad_input=1)
-
-        net_layers['deconv3'] = self._upscore_layer(net_layers['deconv2'], shape=None,
-                                           num_classes=128,
-                                           debug=debug, name='deconv3', ksize=3, stride=2, pad_input=1)
-
-        net_layers['deconv4'] = self._upscore_layer(net_layers['deconv3'], shape=None,
-                                           num_classes=64,
-                                           debug=debug, name='deconv4', ksize=3, stride=2, pad_input=1)
-        net_layers['deconv5'] = self._upscore_layer(net_layers['deconv4'], shape=None,
-                                           num_classes=32,
-                                           debug=debug, name='deconv5', ksize=3, stride=2, pad_input=1)
-        net_layers['deconv6'] = self._upscore_layer(net_layers['deconv5'], shape=None,
-                                           num_classes=2,
-                                           debug=debug, name='deconv6', ksize=3, stride=1, pad_input=1)
-
-       #resize to 224 224 to give flow(deconv6) - not needed-function will handle
-       ##add gxy to flow to get coords !! not needed -function will handle
-       #remap using bilinear on (flow(deconv6) and input_imgs) to get predImg
-        net_layers['predImg']=bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
-
-        #deconv5 (16 channels should be), upsample, then conv to 1 channel
-
-        self.net_layers = net_layers
-
-
-    def tvsn_gen():
-
-
-        #encoder
-        gen_conv1 =  self.conv(self.net_layers['predImg'],4,3,16,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn1 = tf.nn.leaky_relu(batch_norm(gen_conv1,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv1'))
-        
-        gen_conv2 =  self.conv(gen_conv_bn1,4,16,32,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn2 = tf.nn.leaky_relu(batch_norm(gen_conv2,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv2'))
-        
-        gen_conv3 =  self.conv(gen_conv_bn2, 4, 32, 64,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn3 = tf.nn.leaky_relu(batch_norm(gen_conv3,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv3'))
-        
-        gen_conv4 =  self.conv(gen_conv_bn3, 4, 64, 128,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn4 = tf.nn.leaky_relu(batch_norm(gen_conv4,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv4'))
-        
-        gen_conv5 =  self.conv(gen_conv_bn4, 4, 128, 256,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn5 = tf.nn.leaky_relu(batch_norm(gen_conv5,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv5'))
-             
-        gen_conv6 =  self.conv(gen_conv_bn5, 4, 256, 512,name='',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        gen_conv_bn6 = tf.nn.leaky_relu(batch_norm(gen_conv6,decay=0.9, is_training = phase, updates_collections = None,zero_debias_moving_mean=True, scope='gen_conv6'))
-        
-
-        #bottleneck
-        self.net_layers['gen_view_fc1'] = self.fc(self.tform, 6 , 128, name='gen_view_fc1', relu = 1)
-        #if self.is_train:
-        #    net_layers['fc2'] = tf.nn.dropout(net_layers['fc2'], self.keep_prob)
-        self.net_layers['gen_view_fc2'] = tf.reshape(self.fc(self.tform, 128 , 128, name='gen_view_fc2', relu = 1), shape=[-1,1,1,128])
-
-        net_layers['gen_view_conv'] = tf.contrib.layers.conv2d_transpose(net_layers['gen_view_fc2'],128,4) 
-
-        net_layers['gen_view_conv'] = tf.nn.relu(batch_norm(net_layers['gen_view_conv'], is_training=phase, updates_collections=None,zero_debias_moving_mean=True, scope='gen_view_conv'))
-
-
-        net_layers['concat1'] = tf.concat([net_layers['gen_conv_bn6'], net_layers['gen_view_conv'], net_layers['']], 3) ##is this 0 dimension correct?
-        concat2 =  self.conv(self.net_layers['concat1'], 3, 512+512+128, 512, name='', strides=[1,1,1,1] , padding='VALID', groups=1,pad_input=1, relu=0)
-        concat2 = tf.nn.relu(batch_norm(concat2,is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope='concat2' ))
-
-
-        concat3 =  self.conv(self.net_layers['concat2'], 3, 512, 512, name='', strides=[1,1,1,1] , padding='VALID', groups=1,pad_input=1, relu=0)
-        concat3 = tf.nn.relu(batch_norm(concat3,is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope='concat3' ))
-
-
-        #decoder
-
-
-        deconv1 = tf.nn.conv2d_transpose(concat3, 256, 4, stride=2, padding='SAME') ##??
-        deconv1 = tf.nn.relu(batch_norm(deconv1 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-
-        deconv1 = tf.nn.conv2d(deconv1,3, 256, 256, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv1 = tf.nn.relu(batch_norm(deconv1 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-
-
-
-
-        deconv2 = tf.nn.conv2d_transpose(deconv1, 128, 4, stride=2, padding='SAME') ##??
-        deconv2 = tf.nn.relu(batch_norm(deconv2 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-
-        deconv2 = tf.nn.conv2d(deconv2,3, 128, 128, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv2 = tf.nn.relu(batch_norm(deconv2 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-
-
-
-
-        deconv3 = tf.nn.conv2d_transpose(deconv2, 64, 4, stride=2, padding='SAME') ##??
-        deconv3 = tf.nn.relu(batch_norm(deconv3 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-        net_layers['skip_deconv3'] = tf.concat([deconv3, gen_conv_bn3], 3) ##is this 0 dimension correct?
-
-        deconv3 = tf.nn.conv2d(skip_deconv3,3, 64+64, 64, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv3 = tf.nn.relu(batch_norm(deconv3 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-
-
-
-
-        deconv4 = tf.nn.conv2d_transpose(deconv3, 32, 4, stride=2, padding='SAME') ##??
-        deconv4 = tf.nn.relu(batch_norm(deconv4 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-        net_layers['skip_deconv4'] = tf.concat([deconv4, gen_conv_bn2], 3) ##is this 0 dimension correct?
-
-        deconv4 = tf.nn.conv2d(skip_deconv4,3, 32+32, 32, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv4 = tf.nn.relu(batch_norm(deconv4 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-
-
-
-        deconv5 = tf.nn.conv2d_transpose(deconv4, 16, 4, stride=2, padding='SAME') ##??
-        deconv5 = tf.nn.relu(batch_norm(deconv5 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-        net_layers['skip_deconv5'] = tf.concat([deconv5, gen_conv_bn1], 3) ##is this 0 dimension correct?
-
-        deconv5 = tf.nn.conv2d(skip_deconv5,3, 16+16, 16, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv5 = tf.nn.relu(batch_norm(deconv5 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-
-
-
-        deconv6 = tf.nn.conv2d_transpose(deconv5, 16, 4, stride=2, padding='SAME') ##??
-        deconv6 = tf.nn.relu(batch_norm(deconv6 , is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-        net_layers['skip_deconv6'] = tf.concat([deconv6, self.input_imgs], 3) ##is this 0 dimension correct?
-
-        deconv6 = tf.nn.conv2d(skip_deconv6, 3, 16+3, 16, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 ) #padding?
-        deconv6 = tf.nn.relu(batch_norm(deconv6, is_training=phase, updates_collections=None, zero_debias_moving_mean=True, scope=''))
-
-        deconv6 = tf.nn.tanh(tf.nn.conv2d(deconv6, 3, 16, 3, name='',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, relu=0 )) #padding?
-
-
-    def tvsn_discrim():
-        discrim_feat1a =  self.conv(self.net_layers['predImg_final'],4,3,64,name='discrim_feat1a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['discrim_feat1b']= tf.nn.leaky_relu(batch_norm(discrim_feat1a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat1b'))
-        
-        print(self.net_layers['discrim_feat1b'].shape)
-
-        discrim_feat2a =  self.conv(self.net_layers['discrim_feat1b'],4,64,64,name='discrim_feat2a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['discrim_feat2b']= tf.nn.leaky_relu(batch_norm(discrim_feat2a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat2b'))
-
-        print(self.net_layers['discrim_feat2b'].shape)
-        
-        discrim_feat3a =  self.conv(self.net_layers['discrim_feat2b'],4,64,64,name='discrim_feat3a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['discrim_feat3b']= tf.nn.leaky_relu(batch_norm(discrim_feat3a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat3b'))
-        
-        print(self.net_layers['discrim_feat3b'].shape)
-
-        discrim_feat4a =  self.conv(self.net_layers['discrim_feat3b'],4,64,128,name='discrim_feat4a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['discrim_feat4b']= tf.nn.leaky_relu(batch_norm(discrim_feat4a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat4b'))
-
-        print(self.net_layers['discrim_feat4b'].shape)
-        
-        discrim_feat5a =  self.conv(self.net_layers['discrim_feat4b'],4,128,256,name='discrim_feat5a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['discrim_feat5b']= tf.nn.leaky_relu(batch_norm(discrim_feat5a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat5b'))
-
-        print(self.net_layers['discrim_feat5b'].shape)
-             
-        discrim_feat6a =  self.conv(self.net_layers['discrim_feat5b'],4,256,512,name='discrim_feat6a',strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
-        self.net_layers['discrim_feat6b']= tf.nn.leaky_relu(batch_norm(discrim_feat6a,decay=0.9, is_training = phase, updates_collections = None, zero_debias_moving_mean=True, scope='discrim_feat6b'))
-        self.net_layers['discrim_out'] =  self.conv(self.net_layers['discrim_feat6'],4,512,1,name='discrim_out',strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=0)
-        ##out = tf.nn.sigmoid(out)
-
-        ##number of classes!
-        
-        #bce = tf.nn.softmax_cross_entropy_with_logits(out) #sigmoid!!
-
-        #out -> reshape to flatten out
-        ##check if this works identically in terms of output size
-
-        #later, stack is wrong btw
-        self.net_layers['concat_feats_discrim'] = tf.stack([self.net_layers['discrim_feat1b'],self.net_layers['discrim_feat2b'],self.net_layers['discrim_feat3b']], name='concat_feats_discrim')
 
     def _upscore_layer(self, bottom, shape,num_classes, name, debug, ksize=3, stride=2, pad_input=1, relu=1, mode='bilinear'):
 
@@ -515,28 +648,6 @@ class Net_tvsn(object):
 
     def reconstruction_loss():
         return tf.reduce_mean(tf.abs(real_images - generated_images))
-
-    def lsgan_loss_generator(prob_fake_is_real):
-        return tf.reduce_mean(tf.squared_difference(prob_fake_is_real, 1))
-    
-    def lsgan_loss_discriminator(prob_real_is_real, prob_fake_is_real):
-    
-        """ 
-        Rather than compute the negative loglikelihood, a least-squares loss is
-        used to optimize the discriminators as per Equation 2 in:
-            Least Squares Generative Adversarial Networks
-            Xudong Mao, Qing Li, Haoran Xie, Raymond Y.K. Lau, Zhen Wang, and
-            Stephen Paul Smolley.
-            https://arxiv.org/pdf/1611.04076.pdf
-        Args:
-            prob_real_is_real: The discriminator's estimate that images actually
-                drawn from the real domain are in fact real.
-            prob_fake_is_real: The discriminator's estimate that generated images
-                made to look like real images are real.
-        Returns:
-            The total LS-GAN loss.
-        """
-        return (tf.reduce_mean(tf.squared_difference(prob_real_is_real, 1)) + tf.reduce_mean(tf.squared_difference(prob_fake_is_real, 0))) * 0.5
     
     def compute_exp_reg_loss(self, pred, ref):
         l = tf.nn.softmax_cross_entropy_with_logits(
@@ -544,14 +655,12 @@ class Net_tvsn(object):
             logits=tf.reshape(pred, [-1, 2]))
         return tf.reduce_mean(l)
 
-    #def loss_discrim(): tf.nn.sigmoid_cross_entropy_with_logits()
-
     def tvloss(generated_images):
         return tf.image.total_variation(generated_images) 
 
     def loss_doafn(self):
-        #explainability weighted loss with reconstruction loss for output img
         return self.reconstruction_loss_exp( self.tgts, self.tgt_imgs, self.net_layers['deconv_mask'])
+        #explainability weighted loss with input img
 
     def __init__(self, batch_size, trainable, exp_weight):
         self.batch_size = batch_size

@@ -10,7 +10,7 @@ import gc
 from helper_tvsn import InputHelper, save_plot
 import gzip
 from random import random
-from tvsn import Net_tvsn
+from tvsn_ae import Net_tvsn
 from scipy.misc import imsave
 import sys
 # Parameters
@@ -28,15 +28,15 @@ tf.flags.DEFINE_string("kitti_odom_path", "/home/tushar/dataset/Datasets/Kitti_B
 tf.flags.DEFINE_string("kitti_parentpath", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/sequences/", "training folder")
 
 #synthia paths
-tf.flags.DEFINE_string("synthia_parentpath", "/home/gunshi/Downloads/synthia/", "training folder")
+tf.flags.DEFINE_string("synthia_parentpath", "/scratch/tushar.vaidya/synthia/", "training folder")
 tf.flags.DEFINE_string("synthia_configpath", "SYNTHIA_data.txt", "training folder")
 tf.flags.DEFINE_string("synthia_frame_info_path", "FRAMES_SYNTHIA.txt", "training folder")
 tf.flags.DEFINE_string("synthia_odom_path", "CameraParams/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_rgb_path", "RGB/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_semseg_path", "GT/COLOR/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_depth_path", "Depth/Stereo_Left/", "training folder")
-tf.flags.DEFINE_string("synthia_output_save_path", "/home/gunshi/Downloads/network_outputs/", "training folder")
-tf.flags.DEFINE_string("synthia_image_save_path", "/home/gunshi/Downloads/network_outputs/imgs/", "training folder")
+tf.flags.DEFINE_string("synthia_output_save_path", "/scratch/tushar.vaidya/afn/outputs/", "training folder")
+tf.flags.DEFINE_string("synthia_image_save_path", "/scratch/tushar.vaidya/afn/outputs/imgs/", "training folder")
 
 
 tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)")
@@ -95,7 +95,7 @@ if(FLAGS.dataset_to_use=='KITTI'):
 if(FLAGS.dataset_to_use=='SYNTHIA'):
     seqstest = [4]
     seqstrain = [1,2]
-    imgs_counts = {1:{'DAWN':1451},2:{'FALL':742},4:{'SUMMER':901, 'SPRING':959},5:{},6:{}}
+    imgs_counts = {1:{'DAWN':1451,'NIGHT':935,'SUMMER':945,'SPRING':1189},2:{'SUMMER':888,'FALL':742,'SPRING':969,'NIGHT':720},4:{'SUMMER':901, 'SPRING':959,'DAWN':850,'SUNSET':958 },5:{'DAWN':,'SPRING':295,'SUNSET':707,'SUMMER':787},6:{'SUNSET':841,'SUMMER':1014,'SPRING':1044,'NIGHT':850}}
     inpH.setup_synthia_sparse(FLAGS.synthia_odom_path, FLAGS.synthia_parentpath, FLAGS.synthia_rgb_path, imgs_counts)
 
 
@@ -127,16 +127,13 @@ with tf.Graph().as_default():
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
         #learning_rate=tf.train.exponential_decay(1e-5, global_step, sum_no_of_batches*5, 0.95, staircase=False, name=None)
-        optimizer1 = tf.train.AdamOptimizer(FLAGS.lr)
-
-        optimizer2 = tf.train.AdamOptimizer(FLAGS.lr)
-
+        optimizer = tf.train.AdamOptimizer(FLAGS.lr)
         print("initialized Net object")
 
-    grads_and_vars=optimizer.compute_gradients(convModel.loss)
-    tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
-    #tr_op_set_dis = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
-
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        grads_and_vars=optimizer.compute_gradients(convModel.loss)
+        tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
     # keep track of gradient values and sparsity (optional)
     grad_summaries = []
@@ -150,7 +147,7 @@ with tf.Graph().as_default():
     print("defined gradient summaries")
     # Output directory for models and summaries
     timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join("/home/gunshi/Downloads/network_outputs/", "runs", FLAGS.name))
+    out_dir = os.path.abspath(os.path.join("/scratch/tushar.vaidya/afn/outputs/", "runs", FLAGS.name))
     print("Writing to {}\n".format(out_dir))
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
