@@ -144,3 +144,4 @@ def deconv(batch_input, out_channels, name="deconv"):
                                       batch, in_height * 2, in_width * 2,
                                       out_channels], [1, 2, 2, 1], padding="SAME")  # noqa
         return conv
+
