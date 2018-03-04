@@ -234,7 +234,7 @@ class InputHelper(object):
 
         assert(len(odomlist)==seq_imgs_num)
         for x in range(batch_size):
-            src_img_num=np.random.randint(0,seq_imgs_num)
+            src_img_num=np.random.randint(1,seq_imgs_num)
             radius_num=np.random.randint(1,sample_range+1)
             odom_src_4x4=odomlist[src_img_num]
             if random()>0.5:
@@ -283,7 +283,7 @@ class InputHelper(object):
 
         for x in range(batch_size):
 
-            src_img_num = np.random.randint(0,seq_imgs_num)
+            src_img_num = np.random.randint(1,seq_imgs_num)
             radius_num_a = np.random.randint(1,int(sample_range/2)+1)
             radius_num_b = np.random.randint(1,int(sample_range/2)+1)
             odom_src = odomlist[src_img_num]
@@ -504,7 +504,7 @@ class InputHelper(object):
 
     def batch_iter(self, x1, x2, y, video_lengths, batch_size, num_epochs, conv_model_spec, shuffle=True, is_train=True):
         """
-        Generates a batch iterator for a dataset.
+        #Generates a batch iterator for a dataset.
         """
         data_size = len(y)
         temp = int(data_size/batch_size)
