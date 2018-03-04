@@ -54,7 +54,7 @@ tf.flags.DEFINE_float("lr", 0.0001, "learning-rate(default: 0.00001)")
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
-tf.flags.DEFINE_string("summaries_dir", "/home/gunshi/Downloads/network_outputs/summaries/", "Summary storage")
+tf.flags.DEFINE_string("summaries_dir", "/scratch/tushar.vaidya/afn/outputs/summaries/", "Summary storage")
 
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
@@ -95,7 +95,7 @@ if(FLAGS.dataset_to_use=='KITTI'):
 if(FLAGS.dataset_to_use=='SYNTHIA'):
     seqstest = [4]
     seqstrain = [1,2]
-    imgs_counts = {1:{'DAWN':1451,'NIGHT':935,'SUMMER':945,'SPRING':1189},2:{'SUMMER':888,'FALL':742,'SPRING':969,'NIGHT':720},4:{'SUMMER':901, 'SPRING':959,'DAWN':850,'SUNSET':958 },5:{'DAWN':,'SPRING':295,'SUNSET':707,'SUMMER':787},6:{'SUNSET':841,'SUMMER':1014,'SPRING':1044,'NIGHT':850}}
+    imgs_counts = {1:{'DAWN':1451,'NIGHT':935,'SUMMER':945,'SPRING':1189},2:{'SUMMER':888,'FALL':742,'SPRING':969,'NIGHT':720},4:{'SUMMER':901, 'SPRING':959,'DAWN':850,'SUNSET':958 },5:{'SPRING':295,'SUNSET':707,'SUMMER':787},6:{'SUNSET':841,'SUMMER':1014,'SPRING':1044,'NIGHT':850}}
     inpH.setup_synthia_sparse(FLAGS.synthia_odom_path, FLAGS.synthia_parentpath, FLAGS.synthia_rgb_path, imgs_counts)
 
 
@@ -190,13 +190,18 @@ with tf.Graph().as_default():
                         convModel.aux_imgs: src_batch[1],
                         convModel.tgt_imgs: tgt_batch,
                         convModel.tform: tform_batch[0],
-                        convModel.tform_aux: tform_batch[1] }
+                        convModel.tform_aux: tform_batch[1],
+                        convModel.keep_prob: FLAGS.dropout_keep_prob,
+                        convModel.is_train:True}
 
         else:
 
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.tgt_imgs: tgt_batch,
-                        convModel.tform: tform_batch[0] }
+                        convModel.tform: tform_batch[0], 
+                        convModel.keep_prob: FLAGS.dropout_keep_prob,
+                        convModel.is_train:True}
+
 
 
         if(train_iter%2000==0):
