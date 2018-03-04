@@ -295,7 +295,7 @@ class Net_tvsn(object):
             (32, 0.0),
         ]
 
-    def encoder_decoder(inputs, tforms):
+    def encoder_decoder():
         """The autoencoder network architecture from pix2pix.
 
         Args:
@@ -544,19 +544,11 @@ class Net_tvsn(object):
         deconv6_x2 = tf.image.resize_bilinear(net_layers['deconv5'], [224, 448])
         net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 2, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
 
-
-        #remap using bilinear on (flow(deconv6) and input_imgs) to get predImg
-        net_layers['predImg'] = bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
-
-        deconv_x2_mask = tf.image.resize_bilinear(net_layers['deconv5'], [224, 448])
-
-        #net_layers['deconv_mask'] = tf.nn.sigmoid(self.conv(deconv_x2_mask, 5, 16 , 2, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
-
+        net_layers['predImg'] = net_layers['deconv6']
         net_layers['deconv_mask'] = self.conv(deconv_x2_mask, 5, 16 , 2, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
 
         self.net_layers = net_layers
 
-        #resampler(self.input_imgs,net_layers['flow_aux'],name='resampler')
 
     def _upscore_layer(self, bottom, shape,num_classes, name, debug, ksize=3, stride=2, pad_input=1, relu=1, mode='bilinear'):
 
