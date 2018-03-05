@@ -87,18 +87,17 @@ class Net_tvsn(object):
 
             return tf.nn.relu(out_res + inputres)
 
-    def encdec_resnet_fcn(inputs, network_id, num_separate_layers, num_no_skip_layers):
+    def encdec_resnet_fcn():
         """
-
         The generator consists of three parts: Conv, ResNet blocks and DeConv.
-        in the middle blocks.
-
-        Args:
-            inputs: a tensor as the input image.
-            network_id: an integer as the id of the network (1-4).
-            num_separate_layers: an integer as the number of separate layers.
-            num_no_skip_layers: a dummy variable which is not used.
         """
+
+        net_layers = {}
+        self.input_imgs = tf.placeholder(tf.float32, shape = [None, 256, 256, 3], name = "input_imgs")
+        self.input_batch_size = tf.shape(self.input_imgs)[0]  # Returns a scalar `tf.Tensor`
+        self.tform = tf.placeholder(tf.float32, shape = [None, 6], name = "tform")
+
+
         fl_ks = 7  # kernel size of the first and last layer
         ks = 3
         padding = "CONSTANT"
@@ -127,8 +126,7 @@ class Net_tvsn(object):
         channel_factor = 4 
         for i in range(3):
             scope = 'conv_enc_res_middle'
-            #scope, reuse = get_scope_and_reuse_resnet(
-                #network_id, i, 9, num_separate_layers)
+            #scope, reuse = get_scope_and_reuse_resnet(network_id, i, 9, num_separate_layers)
             with tf.variable_scope(scope):
                 if reuse is True:
                     tf.get_variable_scope().reuse_variables()
@@ -144,8 +142,7 @@ class Net_tvsn(object):
         with tf.variable_scope(scope):
             if reuse is True:
                 tf.get_variable_scope().reuse_variables()
-            #pad_input = tf.pad(
-                #inputs, [[0, 0], [ks, ks], [ks, ks], [0, 0]], padding)
+            #pad_input = tf.pad(inputs, [[0, 0], [ks, ks], [ks, ks], [0, 0]], padding)
 
             o_c7 = layers.general_conv2d(
                 in_t, _num_generator_filters*channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c7")  # noqa
@@ -153,13 +150,35 @@ class Net_tvsn(object):
             o_c8 = layers.general_conv2d(
                 o_c7, _num_generator_filters *channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c8")  # noqa
             
-        #check channels
 
-        # add bottleneck processing + transfrmation fc
 
-        # 4 more deconv or resize + conv1x1 + 2 residual
-        #viewconcat
-        #net_layerify
+
+        # layer names correct, check channels
+        # 2 residuals to deconv
+        # change these deconv image sizes////////////////////////
+        # add batchnorm/instance norm everywhere
+
+        net_layers['fc1'] = self.fc(net_layers['Convolution6'], 4*4*512 , 2048, name='fc_conv6', relu = 1)
+        
+        net_layers['trans_fc1'] = self.fc(self.tform, 6 , 128, name='view_fc1', relu = 1)
+        net_layers['trans_fc2'] = self.fc(net_layers['trans_fc1'], 128 , 256, name='view_fc2', relu = 1)
+
+        #print(net_layers['fc_conv6'].shape)
+        #print(net_layers['view_fc2'].shape)
+
+        net_layers['view_concat'] = tf.concat([o_c8, net_layers['trans_fc2']], 1)
+
+        net_layers['de_fc1'] = self.fc(net_layers['view_concat'], 2304 , 2048, name='de_fc1', relu = 1)
+        
+        net_layers['de_fc1'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc1'], self.keep_prob) , lambda: net_layers['de_fc1'])
+                
+        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 512*4*4, name='de_fc3', relu = 1)
+
+        net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc2'],shape=[-1, 4, 4, 512], name='de_fc3_rs')
+
+
+
+
 
         #scope, reuse = get_scope_and_reuse_deconv(network_id)
         scope = 'resnet_deconv'
@@ -168,19 +187,19 @@ class Net_tvsn(object):
                 tf.get_variable_scope().reuse_variables()
 
             o_dc1 = layers.general_deconv2d(
-                viewconcat, [BATCH_SIZE, 128, 128, _num_generator_filters *
+                de_fc3_rs, [BATCH_SIZE, 128, 128, _num_generator_filters *  
                       2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
-                "SAME", "c4")
+                "SAME", "dc1")
 
             o_dc2 = layers.general_deconv2d(
                 o_dc1, [BATCH_SIZE, 128, 128, _num_generator_filters *
                       2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
-                "SAME", "c4")
+                "SAME", "dc2")
 
             o_dc3 = layers.general_deconv2d(
                 o_dc2, [BATCH_SIZE, 128, 128, _num_generator_filters *
                       2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
-                "SAME", "c4")
+                "SAME", "dc3")
 
 
 
@@ -189,21 +208,19 @@ class Net_tvsn(object):
             o_dc4 = layers.general_deconv2d(
                 o_dc3, [BATCH_SIZE, 128, 128, _num_generator_filters *
                       2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
-                "SAME", "c4")
+                "SAME", "dc4")
             
             o_dc5 = layers.general_deconv2d(
                 o_dc4, [BATCH_SIZE, 256, 256, _num_generator_filters],
                 _num_generator_filters, ks, ks, 2, 2, 0.02,
-                "SAME", "c5")
+                "SAME", "dc5")
             
 
             o_dc6 = layers.general_conv2d(o_dc5, IMG_CHANNELS, fl_ks, fl_ks,
-                                         1, 1, 0.02, "SAME", "c6",
+                                         1, 1, 0.02, "SAME", "dc6",
                                          do_norm=False, do_relu=False)
 
-            out_gen = tf.nn.tanh(o_c6, "t1")
-
-        return out_gen
+            net_layers['predImg'] = tf.nn.tanh(o_c6, "t1")
 
 
     def generator_resnet_9blocks(inputs, network_id, num_separate_layers, num_no_skip_layers):
