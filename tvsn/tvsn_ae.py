@@ -113,14 +113,11 @@ class Net_tvsn(object):
             pad_input = tf.pad(
                 inputs, [[0, 0], [ks, ks], [ks, ks], [0, 0]], padding)
 
-            o_c1 = layers.general_conv2d(
-                pad_input, _num_generator_filters, fl_ks, fl_ks, 1, 1, 0.02, name="c1")  # noqa
+            o_c1 = layers.general_conv2d(pad_input, _num_generator_filters, fl_ks, fl_ks, 1, 1, 0.02, name="c1")  # noqa
             
-            o_c2 = layers.general_conv2d(
-                o_c1, _num_generator_filters * 2, ks, ks, 2, 2, 0.02, "SAME", "c2")  # noqa
+            o_c2 = layers.general_conv2d(o_c1, _num_generator_filters * 2, ks, ks, 2, 2, 0.02, "SAME", "c2")  # noqa
             
-            o_c3 = layers.general_conv2d(
-                o_c2, _num_generator_filters * 4, ks, ks, 2, 2, 0.02, "SAME", "c3")  # noqa
+            o_c3 = layers.general_conv2d(o_c2, _num_generator_filters * 4, ks, ks, 2, 2, 0.02, "SAME", "c3")  # noqa
 
         in_t = o_c3
         channel_factor = 4 
@@ -130,13 +127,10 @@ class Net_tvsn(object):
             with tf.variable_scope(scope):
                 if reuse is True:
                     tf.get_variable_scope().reuse_variables()
-                out = build_resnet_block(
-                    in_t, _num_generator_filters * channel_factor, 'r{}'.format(i),
-                    padding)
+                out = build_resnet_block(in_t, _num_generator_filters * channel_factor, 'r{}'.format(i),padding)
                 in_t = out
                 channel_factor = channel_factor*2
-                in_t = layers.general_conv2d(
-                    out, _num_generator_filters * channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c"+str(i))  # noqa
+                in_t = layers.general_conv2d(out, _num_generator_filters * channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c"+str(i))  # noqa
 
         scope = 'conv_enc_after_res'
         with tf.variable_scope(scope):
@@ -144,11 +138,9 @@ class Net_tvsn(object):
                 tf.get_variable_scope().reuse_variables()
             #pad_input = tf.pad(inputs, [[0, 0], [ks, ks], [ks, ks], [0, 0]], padding)
 
-            o_c7 = layers.general_conv2d(
-                in_t, _num_generator_filters*channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c7")  # noqa
+            o_c7 = layers.general_conv2d(in_t, _num_generator_filters*channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c7")  # noqa
             
-            o_c8 = layers.general_conv2d(
-                o_c7, _num_generator_filters *channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c8")  # noqa
+            o_c8 = layers.general_conv2d(o_c7, _num_generator_filters *channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c8")  # noqa
             
 
 
@@ -210,14 +202,13 @@ class Net_tvsn(object):
                 _num_generator_filters, ks, ks, 2, 2, 0.02,
                 "SAME", "dc5")
             
-           o_dc6 = layers.general_deconv2d(
+            o_dc6 = layers.general_deconv2d(
                 o_dc5, [BATCH_SIZE, 256, 256, _num_generator_filters],
                 _num_generator_filters, ks, ks, 2, 2, 0.02,
                 "SAME", "dc6")
 
             o_dc7 = layers.general_conv2d(o_dc6, IMG_CHANNELS, fl_ks, fl_ks,
-                                         1, 1, 0.02, "SAME", "dc6",
-                                         do_norm=False, do_relu=False)
+                1, 1, 0.02, "SAME", "dc6",do_norm=False, do_relu=False)
 
             net_layers['predImg'] = tf.nn.tanh(o_dc7, "t1")
 
@@ -466,22 +457,36 @@ class Net_tvsn(object):
 
         ##add fcs for bottleneck with transform info
         net_layers['fc_conv6'] = self.fc(net_layers['Convolution6'], 4*4*512 , 2048, name='fc_conv6', relu = 1)
-        net_layers['view_fc1'] = self.fc(self.tform, 6 , 128, name='view_fc1', relu = 1)
-        net_layers['view_fc2'] = self.fc(view_fc1, 128 , 256, name='view_fc2', relu = 1)
-        net_layers['view_concat'] = tf.concat([net_layers['fc_conv6'], net_layers['view_fc2']], 0) ##is this 0 dimension correct?
+        net_layers['fc_conv6']= batch_norm(net_layers['fc_conv6'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='fc_conv6_bn')
+        
+
+	net_layers['view_fc1'] = self.fc(self.tform, 6 , 128, name='view_fc1', relu = 1)        
+
+	net_layers['view_fc2'] = self.fc(view_fc1, 128 , 256, name='view_fc2', relu = 1)
+
+        
+	net_layers['view_concat'] = tf.concat([net_layers['fc_conv6'], net_layers['view_fc2']], 0)
+
 
         net_layers['de_fc1'] = self.fc(net_layers['view_concat'], 2304 , 2048, name='de_fc1', relu = 1)
+        net_layers['de_fc1']= batch_norm(net_layers['de_fc1'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='de_fc1_bn')
+
         
         if self.is_train:
             net_layers['de_fc1'] = tf.nn.dropout(net_layers['de_fc1'], self.keep_prob)
         
         net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1)
-        
+        net_layers['de_fc2']= batch_norm(net_layers['de_fc2'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='de_fc2_bn')
+
         if self.is_train:
             net_layers['de_fc2'] = tf.nn.dropout(net_layers['de_fc2'], self.keep_prob)
 
         net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*4, name='de_fc3', relu = 1)
+        net_layers['de_fc3']= batch_norm(net_layers['de_fc3'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='de_fc3_bn')
+
         net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 4, 512], name='de_fc3_rs')
+
+
        
 
         deconv1_x2 = tf.image.resize_bilinear(net_layers['de_fc3_rs'], [8, 8])
@@ -502,8 +507,6 @@ class Net_tvsn(object):
         deconv6_x2 = tf.image.resize_bilinear(net_layers['deconv5'], [256, 256])
         net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 3, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
 
-        #do something additonal to the image here?
-        #batch norm?
 
         deconv_x2_mask = tf.image.resize_bilinear(net_layers['deconv5'], [256, 256])
         net_layers['deconv_mask'] = self.conv(deconv_x2_mask, 5, 16 , 2, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
@@ -511,10 +514,11 @@ class Net_tvsn(object):
         self.net_layers = net_layers
 
 
-    def doafn_aspect_wide(self):
+    def doafn_aspect_wide(self,phase):
 
         #input is mean subtracted, normalised to -1 to 1
-        debug = True
+        reuse=False
+	debug = True
         net_layers = {}
         self.input_imgs = tf.placeholder(tf.float32, shape = [None, 224, 448, 3], name = "input_imgs")
         self.input_batch_size = tf.shape(self.input_imgs)[0]  # Returns a scalar `tf.Tensor`
@@ -523,22 +527,38 @@ class Net_tvsn(object):
         # Conv-Layers
         net_layers['Convolution1'] = self.conv(self.input_imgs, 5, 3 , 16, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
         print(net_layers['Convolution1'].shape)
+	
 
 
         net_layers['Convolution2'] = self.conv(net_layers['Convolution1'], 5, 16 , 32, name= 'Convolution2', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
         print(net_layers['Convolution2'].shape)
 
+        net_layers['Convolution2']= batch_norm(net_layers['Convolution2'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='Convolution2_bn')
+
+
+
+
         net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 5, 32 , 64, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
+
         print(net_layers['Convolution3'].shape)
+
+        net_layers['Convolution3']= batch_norm(net_layers['Convolution3'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='Convolution3_bn')
+
 
 
         net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 64 , 128, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         print(net_layers['Convolution4'].shape)
+        net_layers['Convolution4']= batch_norm(net_layers['Convolution4'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='Convolution4_bn')
+
 
         net_layers['Convolution5'] = self.conv(net_layers['Convolution4'], 3, 128 , 256, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         print(net_layers['Convolution5'].shape)
+        net_layers['Convolution5']= batch_norm(net_layers['Convolution5'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='Convolution5_bn')
+
 
         net_layers['Convolution6'] = self.conv(net_layers['Convolution5'], 3, 256 , 512, name= 'Convolution6', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['Convolution6']= batch_norm(net_layers['Convolution6'],decay=0.9, is_training = phase, updates_collections = None,reuse=reuse,zero_debias_moving_mean=True, scope='Convolution6_bn')
+
 
         print(net_layers['Convolution6'].shape)
         print(tf.shape(net_layers['Convolution6']))
@@ -674,7 +694,7 @@ class Net_tvsn(object):
         self.masks = curr_exp[:,:,:,1]
 	print('masks')
 	print((self.masks).shape)
-        return pixel_loss + exp_loss
+        return pixel_loss + 1.2*exp_loss
 
     def get_reference_explain_mask(self, batch_size,height, width):
         tmp = np.array([0,1])
@@ -709,6 +729,7 @@ class Net_tvsn(object):
         self.batch_size = batch_size
         self.trainable = trainable
         self.is_train=tf.placeholder(tf.bool, name="is_train")
+	self.phase = tf.placeholder(tf.bool,name="phase")
         self.keep_prob = tf.placeholder(tf.float32, name="keep_prob")
         self.tgt_imgs = tf.placeholder(tf.float32, shape = [None, 224, 448, 3], name = "tgt_imgs")
         mean = [104, 117, 123]
@@ -717,7 +738,7 @@ class Net_tvsn(object):
         self.spec = [mean, scale_size]
         self.explain_reg_weight = exp_weight
 
-        self.doafn_aspect_wide()
+        self.doafn_aspect_wide(self.phase)
 
         self.tgts=self.net_layers['predImg']
 	#self.masks = self.net_layers['deconv_mask']

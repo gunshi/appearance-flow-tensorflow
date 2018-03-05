@@ -132,10 +132,10 @@ with tf.Graph().as_default():
         optimizer = tf.train.AdamOptimizer(FLAGS.lr)
         print("initialized Net object")
 
-    #update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    #with tf.control_dependencies(update_ops):
-    grads_and_vars=optimizer.compute_gradients(convModel.loss)
-    tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+    	grads_and_vars=optimizer.compute_gradients(convModel.loss)
+    	tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
     # keep track of gradient values and sparsity (optional)
     grad_summaries = []
@@ -194,7 +194,8 @@ with tf.Graph().as_default():
                         convModel.tform: tform_batch[0],
                         convModel.tform_aux: tform_batch[1], 
                     	convModel.keep_prob: FLAGS.dropout_keep_prob,
-                        convModel.is_train:True}
+                        convModel.is_train:True,
+			convModel.phase:True}
 
 
         else:
@@ -203,7 +204,8 @@ with tf.Graph().as_default():
                         convModel.tgt_imgs: tgt_batch,
                         convModel.tform: tform_batch[0],
                     	convModel.keep_prob: FLAGS.dropout_keep_prob,
-                        convModel.is_train:True}
+                        convModel.is_train:True,
+			convModel.phase:True}
 
 
 
@@ -240,7 +242,8 @@ with tf.Graph().as_default():
                         convModel.tform: tform_batch[0],
                         convModel.tform_aux: tform_batch[1] ,
                         convModel.keep_prob: FLAGS.dropout_keep_prob,
-                        convModel.is_train:False
+                        convModel.is_train:False,
+			convModel.phase:False
                         }
 
         else:
@@ -249,7 +252,8 @@ with tf.Graph().as_default():
                         convModel.tgt_imgs: tgt_batch,
                         convModel.tform: tform_batch[0], 
                         convModel.keep_prob: FLAGS.dropout_keep_prob,
-                        convModel.is_train:False
+                        convModel.is_train:False,
+			convModel.phase:False
                         }
 
 
@@ -260,12 +264,12 @@ with tf.Graph().as_default():
             outputs[i][:,:,:] = outputs[i][:,:,::-1]
             outputs[i] = (outputs[i]*127.5)+127.5
             masks[i] = masks[i]*255
-            imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_maskeval.png', masks[i])
+            imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_maskeval.png', masks[i])
 
-            imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_outputeval.png', outputs[i])
-            imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_targeteval.png', tgt_batch[i])
+            imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_outputeval.png', outputs[i])
+            imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_targeteval.png', tgt_batch[i])
             for j in range(len(src_batch)):
-                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_inputeval'+str(j)+'.png', src_batch[j][i])
+                imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_inputeval'+str(j)+'.png', src_batch[j][i])
             img_num+=1
 
         time_str = datetime.datetime.now().isoformat()
