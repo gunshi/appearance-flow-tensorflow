@@ -220,7 +220,7 @@ class Net_tvsn(object):
         for i in range(9):
             scope = 'resnet_middle'
             #scope, reuse = get_scope_and_reuse_resnet(
-                network_id, i, 9, num_separate_layers)
+                #network_id, i, 9, num_separate_layers)
             with tf.variable_scope(scope):
                 if reuse is True:
                     tf.get_variable_scope().reuse_variables()
@@ -432,12 +432,12 @@ class Net_tvsn(object):
         if self.is_train:
             net_layers['de_fc1'] = tf.nn.dropout(net_layers['de_fc1'], self.keep_prob)
         
-        net_layers['de_fc2'] = self.fc(net_layers['view_concat'], 2048 , 2048, name='de_fc2', relu = 1)
+        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1)
         
         if self.is_train:
             net_layers['de_fc2'] = tf.nn.dropout(net_layers['de_fc2'], self.keep_prob)
 
-        net_layers['de_fc3'] = self.fc(net_layers['view_concat'], 2048 , 512*4*4, name='de_fc3', relu = 1)
+        net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*4, name='de_fc3', relu = 1)
         net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 4, 512], name='de_fc3_rs')
        
 
@@ -512,11 +512,11 @@ class Net_tvsn(object):
         
         net_layers['de_fc1'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc1'], self.keep_prob) , lambda: net_layers['de_fc1'])
         
-        net_layers['de_fc2'] = self.fc(net_layers['view_concat'], 2048 , 2048, name='de_fc2', relu = 1)
+        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1)
         
         net_layers['de_fc2'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc2'], self.keep_prob) , lambda: net_layers['de_fc2'])
 
-        net_layers['de_fc3'] = self.fc(net_layers['view_concat'], 2048 , 512*4*7, name='de_fc3', relu = 1)
+        net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*7, name='de_fc3', relu = 1)
         net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 7, 512], name='de_fc3_rs')
        
 
@@ -542,9 +542,12 @@ class Net_tvsn(object):
         net_layers['deconv5'] = self.conv(deconv5_x2, 5, 32 , 16, name= 'deconv5', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
         
         deconv6_x2 = tf.image.resize_bilinear(net_layers['deconv5'], [224, 448])
-        net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 2, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
+        net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 3, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
 
         net_layers['predImg'] = net_layers['deconv6']
+
+        deconv_x2_mask = tf.image.resize_bilinear(net_layers['deconv5'], [224, 448])
+
         net_layers['deconv_mask'] = self.conv(deconv_x2_mask, 5, 16 , 2, name= 'deconv_mask', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
 
         self.net_layers = net_layers
@@ -625,7 +628,9 @@ class Net_tvsn(object):
         curr_exp = tf.nn.softmax(mask)
         curr_proj_error = tf.abs(real_images - generated_images)
         pixel_loss = tf.reduce_mean(curr_proj_error * tf.expand_dims(curr_exp[:,:,:,1], -1))
-        
+        self.masks = curr_exp[:,:,:,1]
+	print('masks')
+	print((self.masks).shape)
         return pixel_loss + exp_loss
 
     def get_reference_explain_mask(self, batch_size,height, width):
@@ -638,7 +643,7 @@ class Net_tvsn(object):
         ref_exp_mask = tf.constant(ref_exp_mask, dtype=tf.float32)
         return ref_exp_mask
 
-    def reconstruction_loss():
+    def reconstruction_loss(self,real_images,generated_images):
         return tf.reduce_mean(tf.abs(real_images - generated_images))
     
     def compute_exp_reg_loss(self, pred, ref):
@@ -649,6 +654,9 @@ class Net_tvsn(object):
 
     def tvloss(generated_images):
         return tf.image.total_variation(generated_images) 
+
+    def loss_ae(self):
+	return self.reconstruction_loss(self.tgts, self.tgt_imgs)
 
     def loss_doafn(self):
         return self.reconstruction_loss_exp( self.tgts, self.tgt_imgs, self.net_layers['deconv_mask'])
@@ -669,6 +677,7 @@ class Net_tvsn(object):
         self.doafn_aspect_wide()
 
         self.tgts=self.net_layers['predImg']
+	#self.masks = self.net_layers['deconv_mask']
         print('.......')
         print(self.tgts.get_shape())
         with tf.name_scope("loss"):

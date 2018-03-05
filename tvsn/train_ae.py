@@ -43,7 +43,7 @@ tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)
 tf.flags.DEFINE_string("name", "result", "prefix names of the output files(default: result)")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 15, "Batch Size (default: 10)")
+tf.flags.DEFINE_integer("batch_size", 30, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("sample_range", 5, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
@@ -54,13 +54,13 @@ tf.flags.DEFINE_float("lr", 0.0001, "learning-rate(default: 0.00001)")
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
-tf.flags.DEFINE_string("summaries_dir", "/home/gunshi/Downloads/network_outputs/summaries/", "Summary storage")
+tf.flags.DEFINE_string("summaries_dir", "/scratch/tushar.vaidya/afn/outputs/summaries/", "Summary storage")
 
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
-tf.flags.DEFINE_integer("batches_train", 6000 , "batches for train")
-tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
+tf.flags.DEFINE_integer("batches_train", 1000 , "batches for train")
+tf.flags.DEFINE_integer("batches_test", 100, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
 tf.flags.DEFINE_boolean("multi_view_training", False, "Training ConvNet (Default: False)")
 
@@ -95,7 +95,8 @@ if(FLAGS.dataset_to_use=='KITTI'):
 if(FLAGS.dataset_to_use=='SYNTHIA'):
     seqstest = [4]
     seqstrain = [1,2]
-    imgs_counts = {1:{'DAWN':1451,'NIGHT':935,'SUMMER':945,'SPRING':1189},2:{'SUMMER':888,'FALL':742,'SPRING':969,'NIGHT':720},4:{'SUMMER':901, 'SPRING':959,'DAWN':850,'SUNSET':958 },5:{'DAWN':,'SPRING':295,'SUNSET':707,'SUMMER':787},6:{'SUNSET':841,'SUMMER':1014,'SPRING':1044,'NIGHT':850}}
+    imgs_counts = {1:{'DAWN':1451,'NIGHT':935,'SUMMER':945,'SPRING':1189},2:{'SUMMER':888,'FALL':742,'SPRING':969,'NIGHT':720},4:{'SUMMER':901, 'SPRING':959,'DAWN':850,'SUNSET':958 },5:{'SPRING':295,'SUNSET':707,'SUMMER':787},6:{'SUNSET':841,'SUMMER':1014,'SPRING':1044,'NIGHT':850}}
+
     inpH.setup_synthia_sparse(FLAGS.synthia_odom_path, FLAGS.synthia_parentpath, FLAGS.synthia_rgb_path, imgs_counts)
 
 
@@ -130,10 +131,10 @@ with tf.Graph().as_default():
         optimizer = tf.train.AdamOptimizer(FLAGS.lr)
         print("initialized Net object")
 
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        grads_and_vars=optimizer.compute_gradients(convModel.loss)
-        tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
+    #update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    #with tf.control_dependencies(update_ops):
+    grads_and_vars=optimizer.compute_gradients(convModel.loss)
+    tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
     # keep track of gradient values and sparsity (optional)
     grad_summaries = []
@@ -156,9 +157,9 @@ with tf.Graph().as_default():
     if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
     current_path = os.getcwd()
-    imgdir_path=os.path.join(current_path,'imgs')
-    if not os.path.exists(imgdir_path):
-        os.makedirs(imgdir_path)
+    # imgdir_path=os.path.join(current_path,'imgs')
+    #if not os.path.exists(imgdir_path):
+        #os.makedirs(imgdir_path)
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
 
     # Initialize all variables
@@ -192,19 +193,32 @@ with tf.Graph().as_default():
                         convModel.aux_imgs: src_batch[1],
                         convModel.tgt_imgs: tgt_batch,
                         convModel.tform: tform_batch[0],
-                        convModel.tform_aux: tform_batch[1] }
+                        convModel.tform_aux: tform_batch[1], 
+                    	convModel.keep_prob: FLAGS.dropout_keep_prob,
+                        convModel.is_train:True}
+
 
         else:
 
             feed_dict={convModel.input_imgs: src_batch[0],
                         convModel.tgt_imgs: tgt_batch,
-                        convModel.tform: tform_batch[0] }
+                        convModel.tform: tform_batch[0],
+                    	convModel.keep_prob: FLAGS.dropout_keep_prob,
+                        convModel.is_train:True}
 
 
-        if(train_iter%2000==0):
-            outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
+
+        if(train_iter%800==0):
+            outputs,masks, _, step, loss, summary = sess.run([convModel.tgts,convModel.masks, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
+	    #process outputs to get them in range, swap channels
+
             for i in range(len(outputs)):
+		outputs[i][:,:,:] = outputs[i][:,:,::-1]
+		outputs[i] = (outputs[i]*127.5)+127.5
+		masks[i] = masks[i]*255
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_mask.png', masks[i])
+
                 imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
                 imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
                 for j in range(len(src_batch)):

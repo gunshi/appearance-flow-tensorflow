@@ -551,7 +551,7 @@ class InputHelper(object):
         img = img - conv_model_spec[0]
         img = misc.imresize(np.asarray(img), conv_model_spec[1])
         img = (img-127.5)/127.5
-        print(img)
+        #print(img)
         #img = misc.imresize(img, (256,512)) ##224,448
 
         #normalise
@@ -566,7 +566,7 @@ class InputHelper(object):
         img = img - conv_model_spec[0]
         img = misc.imresize(np.asarray(img), conv_model_spec[1])   ##make a square cropping
         img = (img-127.5)/127.5
-        print(img)
+        #print(img)
         #img = misc.imresize(img, (256,512)) ##224,448
 
         #normalise
