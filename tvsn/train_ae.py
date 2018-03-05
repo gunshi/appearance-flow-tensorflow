@@ -255,7 +255,19 @@ with tf.Graph().as_default():
 
 
 
-        step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
+        outputs,masks,step, loss, summary, outputs= sess.run([convModel.tgts,convModel.masks,global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
+            img_num=0
+            for i in range(len(outputs)):
+                outputs[i][:,:,:] = outputs[i][:,:,::-1]
+                outputs[i] = (outputs[i]*127.5)+127.5
+                masks[i] = masks[i]*255
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_maskeval.png', masks[i])
+
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_outputeval.png', outputs[i])
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_targeteval.png', tgt_batch[i])
+                for j in range(len(src_batch)):
+                    imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_inputeval'+str(j)+'.png', src_batch[j][i])
+                img_num+=1
 
         time_str = datetime.datetime.now().isoformat()
 
