@@ -59,8 +59,8 @@ tf.flags.DEFINE_string("summaries_dir", "/scratch/tushar.vaidya/afn/outputs/summ
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
-tf.flags.DEFINE_integer("batches_train", 1000 , "batches for train")
-tf.flags.DEFINE_integer("batches_test", 100, "batches for test")
+tf.flags.DEFINE_integer("batches_train", 900 , "batches for train")
+tf.flags.DEFINE_integer("batches_test", 50, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
 tf.flags.DEFINE_boolean("multi_view_training", False, "Training ConvNet (Default: False)")
 
@@ -256,18 +256,18 @@ with tf.Graph().as_default():
 
 
         outputs,masks,step, loss, summary, outputs= sess.run([convModel.tgts,convModel.masks,global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
-            img_num=0
-            for i in range(len(outputs)):
-                outputs[i][:,:,:] = outputs[i][:,:,::-1]
-                outputs[i] = (outputs[i]*127.5)+127.5
-                masks[i] = masks[i]*255
-                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_maskeval.png', masks[i])
+        img_num=0
+        for i in range(len(outputs)):
+            outputs[i][:,:,:] = outputs[i][:,:,::-1]
+            outputs[i] = (outputs[i]*127.5)+127.5
+            masks[i] = masks[i]*255
+            imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_maskeval.png', masks[i])
 
-                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_outputeval.png', outputs[i])
-                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_targeteval.png', tgt_batch[i])
-                for j in range(len(src_batch)):
-                    imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_inputeval'+str(j)+'.png', src_batch[j][i])
-                img_num+=1
+            imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_outputeval.png', outputs[i])
+            imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_targeteval.png', tgt_batch[i])
+            for j in range(len(src_batch)):
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_inputeval'+str(j)+'.png', src_batch[j][i])
+            img_num+=1
 
         time_str = datetime.datetime.now().isoformat()
 
