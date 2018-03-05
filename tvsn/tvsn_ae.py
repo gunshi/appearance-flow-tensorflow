@@ -153,9 +153,8 @@ class Net_tvsn(object):
 
 
 
-        # layer names correct, check channels
-        # 2 residuals to deconv
-        # change these deconv image sizes////////////////////////
+        # check all code
+        # add 2 residuals to deconv
         # add batchnorm/instance norm everywhere
 
         net_layers['fc1'] = self.fc(net_layers['Convolution6'], 4*4*512 , 2048, name='fc_conv6', relu = 1)
@@ -187,40 +186,40 @@ class Net_tvsn(object):
                 tf.get_variable_scope().reuse_variables()
 
             o_dc1 = layers.general_deconv2d(
-                de_fc3_rs, [BATCH_SIZE, 128, 128, _num_generator_filters *  
-                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                de_fc3_rs, [BATCH_SIZE, 8, 8, _num_generator_filters *  
+                      2], _num_generator_filters * 32, ks, ks, 2, 2, 0.02,
                 "SAME", "dc1")
 
             o_dc2 = layers.general_deconv2d(
-                o_dc1, [BATCH_SIZE, 128, 128, _num_generator_filters *
-                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                o_dc1, [BATCH_SIZE, 16, 16, _num_generator_filters *
+                      2], _num_generator_filters * 16, ks, ks, 2, 2, 0.02,
                 "SAME", "dc2")
 
             o_dc3 = layers.general_deconv2d(
-                o_dc2, [BATCH_SIZE, 128, 128, _num_generator_filters *
-                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                o_dc2, [BATCH_SIZE, 32, 32, _num_generator_filters *
+                      2], _num_generator_filters * 8, ks, ks, 2, 2, 0.02,
                 "SAME", "dc3")
-
-
-
-
             
             o_dc4 = layers.general_deconv2d(
-                o_dc3, [BATCH_SIZE, 128, 128, _num_generator_filters *
-                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                o_dc3, [BATCH_SIZE, 64, 64, _num_generator_filters *
+                      2], _num_generator_filters * 4, ks, ks, 2, 2, 0.02,
                 "SAME", "dc4")
             
             o_dc5 = layers.general_deconv2d(
-                o_dc4, [BATCH_SIZE, 256, 256, _num_generator_filters],
+                o_dc4, [BATCH_SIZE, 128, 128, _num_generator_filters*2],
                 _num_generator_filters, ks, ks, 2, 2, 0.02,
                 "SAME", "dc5")
             
+           o_dc6 = layers.general_deconv2d(
+                o_dc5, [BATCH_SIZE, 256, 256, _num_generator_filters],
+                _num_generator_filters, ks, ks, 2, 2, 0.02,
+                "SAME", "dc6")
 
-            o_dc6 = layers.general_conv2d(o_dc5, IMG_CHANNELS, fl_ks, fl_ks,
+            o_dc7 = layers.general_conv2d(o_dc6, IMG_CHANNELS, fl_ks, fl_ks,
                                          1, 1, 0.02, "SAME", "dc6",
                                          do_norm=False, do_relu=False)
 
-            net_layers['predImg'] = tf.nn.tanh(o_c6, "t1")
+            net_layers['predImg'] = tf.nn.tanh(o_dc7, "t1")
 
 
     def generator_resnet_9blocks(inputs, network_id, num_separate_layers, num_no_skip_layers):
