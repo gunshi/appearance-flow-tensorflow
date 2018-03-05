@@ -44,7 +44,7 @@ tf.flags.DEFINE_string("name", "result", "prefix names of the output files(defau
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 30, "Batch Size (default: 10)")
-tf.flags.DEFINE_integer("sample_range", 5, "Batch Size (default: 10)")
+tf.flags.DEFINE_integer("sample_range", 10, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
 tf.flags.DEFINE_string("loss", "contrastive", "Type of Loss function")
@@ -55,6 +55,7 @@ tf.flags.DEFINE_float("lr", 0.0001, "learning-rate(default: 0.00001)")
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
 tf.flags.DEFINE_string("summaries_dir", "/scratch/tushar.vaidya/afn/outputs/summaries/", "Summary storage")
+tf.flags.DEFINE_string("outputs_dir", "/scratch/tushar.vaidya/afn/outputs/", "Summary storage")
 
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
@@ -148,7 +149,7 @@ with tf.Graph().as_default():
     print("defined gradient summaries")
     # Output directory for models and summaries
     timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join("/scratch/tushar.vaidya/afn/outputs/", "runs", FLAGS.name))
+    out_dir = os.path.abspath(os.path.join(FLAGS.outputs_dir, "runs", FLAGS.name))
     print("Writing to {}\n".format(out_dir))
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
@@ -157,9 +158,7 @@ with tf.Graph().as_default():
     if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
     current_path = os.getcwd()
-    # imgdir_path=os.path.join(current_path,'imgs')
-    #if not os.path.exists(imgdir_path):
-        #os.makedirs(imgdir_path)
+ 
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
 
     # Initialize all variables
