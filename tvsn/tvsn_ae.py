@@ -87,7 +87,7 @@ class Net_tvsn(object):
 
             return tf.nn.relu(out_res + inputres)
 
-    def encdec_resnet(inputs, network_id, num_separate_layers, num_no_skip_layers):
+    def encdec_resnet_fcn(inputs, network_id, num_separate_layers, num_no_skip_layers):
         """
 
         The generator consists of three parts: Conv, ResNet blocks and DeConv.
@@ -103,11 +103,11 @@ class Net_tvsn(object):
         ks = 3
         padding = "CONSTANT"
 
-        _num_generator_filters = 32
+        _num_generator_filters = 16
         reuse = False
 
         #scope, reuse = get_scope_and_reuse_conv(network_id)
-        scope = 'resnet_conv'
+        scope = 'conv_enc_initial'
         with tf.variable_scope(scope):
             if reuse is True:
                 tf.get_variable_scope().reuse_variables()
@@ -126,7 +126,7 @@ class Net_tvsn(object):
         in_t = o_c3
         channel_factor = 4 
         for i in range(3):
-            scope = 'resnet_middle'
+            scope = 'conv_enc_res_middle'
             #scope, reuse = get_scope_and_reuse_resnet(
                 #network_id, i, 9, num_separate_layers)
             with tf.variable_scope(scope):
@@ -140,39 +140,66 @@ class Net_tvsn(object):
                 in_t = layers.general_conv2d(
                     out, _num_generator_filters * channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c"+str(i))  # noqa
 
+        scope = 'conv_enc_after_res'
+        with tf.variable_scope(scope):
+            if reuse is True:
+                tf.get_variable_scope().reuse_variables()
+            #pad_input = tf.pad(
+                #inputs, [[0, 0], [ks, ks], [ks, ks], [0, 0]], padding)
 
-        #add conv last conv here (2 or 1)
+            o_c7 = layers.general_conv2d(
+                in_t, _num_generator_filters*channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c7")  # noqa
+            
+            o_c8 = layers.general_conv2d(
+                o_c7, _num_generator_filters *channel_factor, ks, ks, 2, 2, 0.02, "SAME", "c8")  # noqa
+            
+        #check channels
 
-        # add bottleneck processing
+        # add bottleneck processing + transfrmation fc
 
-
-
-
-        #deconv or resize + conv1x1
+        # 4 more deconv or resize + conv1x1 + 2 residual
+        #viewconcat
+        #net_layerify
 
         #scope, reuse = get_scope_and_reuse_deconv(network_id)
         scope = 'resnet_deconv'
         with tf.variable_scope(scope):
             if reuse is True:
                 tf.get_variable_scope().reuse_variables()
+
+            o_dc1 = layers.general_deconv2d(
+                viewconcat, [BATCH_SIZE, 128, 128, _num_generator_filters *
+                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                "SAME", "c4")
+
+            o_dc2 = layers.general_deconv2d(
+                o_dc1, [BATCH_SIZE, 128, 128, _num_generator_filters *
+                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                "SAME", "c4")
+
+            o_dc3 = layers.general_deconv2d(
+                o_dc2, [BATCH_SIZE, 128, 128, _num_generator_filters *
+                      2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
+                "SAME", "c4")
+
+
+
+
             
-            o_c4 = layers.general_deconv2d(
-                out, [BATCH_SIZE, 128, 128, _num_generator_filters *
+            o_dc4 = layers.general_deconv2d(
+                o_dc3, [BATCH_SIZE, 128, 128, _num_generator_filters *
                       2], _num_generator_filters * 2, ks, ks, 2, 2, 0.02,
                 "SAME", "c4")
             
-            o_c5 = layers.general_deconv2d(
-                o_c4, [BATCH_SIZE, 256, 256, _num_generator_filters],
+            o_dc5 = layers.general_deconv2d(
+                o_dc4, [BATCH_SIZE, 256, 256, _num_generator_filters],
                 _num_generator_filters, ks, ks, 2, 2, 0.02,
                 "SAME", "c5")
             
 
-            o_c6 = layers.general_conv2d(o_c5, IMG_CHANNELS, fl_ks, fl_ks,
+            o_dc6 = layers.general_conv2d(o_dc5, IMG_CHANNELS, fl_ks, fl_ks,
                                          1, 1, 0.02, "SAME", "c6",
                                          do_norm=False, do_relu=False)
-
-
-            #probably need three more deconvs here
 
             out_gen = tf.nn.tanh(o_c6, "t1")
 
