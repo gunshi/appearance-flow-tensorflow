@@ -694,7 +694,7 @@ class Net_tvsn(object):
         self.masks = curr_exp[:,:,:,1]
 	print('masks')
 	print((self.masks).shape)
-        return pixel_loss + 1.2*exp_loss
+        return pixel_loss + 2*exp_loss
 
     def get_reference_explain_mask(self, batch_size,height, width):
         tmp = np.array([0,1])

@@ -96,8 +96,8 @@ if(FLAGS.dataset_to_use=='KITTI'):
 if(FLAGS.dataset_to_use=='SYNTHIA'):
     seqstest = [4]
     seqstrain = [1,2]
-    imgs_counts = {1:{'DAWN':1451,'NIGHT':935,'SUMMER':945,'SPRING':1189},2:{'SUMMER':888,'FALL':742,'SPRING':969,'NIGHT':720},4:{'SUMMER':901, 'SPRING':959,'DAWN':850,'SUNSET':958 },5:{'SPRING':295,'SUNSET':707,'SUMMER':787},6:{'SUNSET':841,'SUMMER':1014,'SPRING':1044,'NIGHT':850}}
-
+    imgs_counts = {1:{'DAWN':1451,'NIGHT':935,'SUMMER':943,'SPRING':1189},2:{'SUMMER':888,'FALL':742,'SPRING':969,'NIGHT':720},4:{'SUMMER':901, 'SPRING':959,'SUNSET':958 },5:{'SPRING':295,'SUNSET':707,'SUMMER':787},6:{'SUNSET':841,'SUMMER':1014,'SPRING':1044,'NIGHT':850}}
+#DAWN 4 850
     inpH.setup_synthia_sparse(FLAGS.synthia_odom_path, FLAGS.synthia_parentpath, FLAGS.synthia_rgb_path, imgs_counts)
 
 
