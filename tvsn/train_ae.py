@@ -215,9 +215,9 @@ with tf.Graph().as_default():
 	    #process outputs to get them in range, swap channels
 
             for i in range(len(outputs)):
-		outputs[i][:,:,:] = outputs[i][:,:,::-1]
-		outputs[i] = (outputs[i]*127.5)+127.5
-		masks[i] = masks[i]*255
+		#outputs[i][:,:,:] = outputs[i][:,:,::-1]
+		#outputs[i] = (outputs[i]*127.5)+127.5
+		#masks[i] = masks[i]*255
                 imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_mask.png', masks[i])
 
                 imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
@@ -261,9 +261,9 @@ with tf.Graph().as_default():
         outputs,masks,step, loss, summary, outputs= sess.run([convModel.tgts,convModel.masks,global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
         img_num=0
         for i in range(len(outputs)):
-            outputs[i][:,:,:] = outputs[i][:,:,::-1]
-            outputs[i] = (outputs[i]*127.5)+127.5
-            masks[i] = masks[i]*255
+            #outputs[i][:,:,:] = outputs[i][:,:,::-1]
+            #outputs[i] = (outputs[i]*127.5)+127.5
+            #masks[i] = masks[i]*255
             imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_maskeval.png', masks[i])
 
             imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_outputeval.png', outputs[i])

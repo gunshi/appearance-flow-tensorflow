@@ -23,7 +23,8 @@ class Net_tvsn(object):
                 temp = tf.get_variable('biases')
                 sess.run(temp.assign(pre_trained_weights[k]['biases']))
 
-    def conv(self, input_, filter_size, in_channels, out_channels, name, strides, padding, groups, pad_input=1, relu=1, pad_num=1):
+    def conv(self, input_, filter_size, in_channels, out_channels, name, strides, padding, groups, pad_input=1, relu=1, pad_num=1, bn = 0 ):
+	
         if pad_input==1:
             paddings = tf.constant([ [0, 0], [pad_num, pad_num,], [pad_num, pad_num], [0, 0] ])
             input_ = tf.pad(input_, paddings, "CONSTANT")
@@ -33,7 +34,12 @@ class Net_tvsn(object):
             bias = tf.get_variable('biases',  shape=[out_channels], trainable=self.trainable)
         if groups == 1:
             if relu:
-                return tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(input_, filt, strides=strides, padding=padding), bias))
+		if(bn):
+		    out = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(input_, filt, strides=strides, padding=padding), bias))
+		    out = batch_norm(out,decay=0.9, is_training = self.phase, updates_collections = None,zero_debias_moving_mean=True, scope = name+'bn')		
+		    return out
+	    	else:
+                    return tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(input_, filt, strides=strides, padding=padding), bias))
             else:
                 return tf.nn.bias_add(tf.nn.conv2d(input_, filt, strides=strides, padding=padding), bias)
 
@@ -45,19 +51,23 @@ class Net_tvsn(object):
 
             conv = tf.concat(axis = 3, values = output_groups)
             if relu:
-                return tf.nn.relu(tf.nn.bias_add(conv, bias))
+                out = tf.nn.relu(tf.nn.bias_add(conv, bias))
+		out = batch_norm(out,decay=0.9, is_training = self.phase, updates_collections = None,zero_debias_moving_mean=True, scope = name+'bn')
+		return out
             else:
                 return tf.nn.bias_add(conv, bias)
 
 
 
-    def fc(self, input_, in_channels, out_channels, name, relu):
+    def fc(self, input_, in_channels, out_channels, name, relu,bn=0):
         input_ = tf.reshape(input_ , [-1, in_channels])
         with tf.variable_scope(name) as scope:
             filt = tf.get_variable('weights', shape=[in_channels , out_channels], trainable=self.trainable)
             bias = tf.get_variable('biases',  shape=[out_channels], trainable=self.trainable)
         if relu:
-            return tf.nn.relu(tf.nn.bias_add(tf.matmul(input_, filt), bias))
+            out = tf.nn.relu(tf.nn.bias_add(tf.matmul(input_, filt), bias))
+	    out = batch_norm(out,decay=0.9, is_training = self.phase, updates_collections = None,zero_debias_moving_mean=True, scope = name+'bn')
+	    return out
         else:
             return tf.nn.bias_add(tf.matmul(input_, filt), bias)
 
@@ -569,17 +579,17 @@ class Net_tvsn(object):
         print(net_layers['fc_conv6'].shape)
         print(net_layers['view_fc2'].shape)
 
-        net_layers['view_concat'] = tf.concat([net_layers['fc_conv6'], net_layers['view_fc2']], 1) ##is this 0 dimension correct?
+        net_layers['view_concat'] = tf.concat([net_layers['fc_conv6'], net_layers['view_fc2']], 1)
 
-        net_layers['de_fc1'] = self.fc(net_layers['view_concat'], 2304 , 2048, name='de_fc1', relu = 1)
+        net_layers['de_fc1'] = self.fc(net_layers['view_concat'], 2304 , 2048, name='de_fc1', relu = 1,bn=1)
         
         net_layers['de_fc1'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc1'], self.keep_prob) , lambda: net_layers['de_fc1'])
         
-        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1)
+        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1,bn=1)
         
         net_layers['de_fc2'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc2'], self.keep_prob) , lambda: net_layers['de_fc2'])
 
-        net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*7, name='de_fc3', relu = 1)
+        net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*7, name='de_fc3', relu = 1,bn=1)
         net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 7, 512], name='de_fc3_rs')
        
 
@@ -589,25 +599,37 @@ class Net_tvsn(object):
         #check paddings! especially for 5 size kernel case!
         #THEY HAVE DONE NEAREST NEIGHBOUR RESAMPLING NOT BILINEAR
         deconv1_x2 = tf.image.resize_bilinear(net_layers['de_fc3_rs'], [7, 14])
-        net_layers['deconv1'] = self.conv(deconv1_x2, 3, 512 , 256, name= 'deconv1', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['deconv1'] = self.conv(deconv1_x2, 3, 512 , 256, name= 'deconv1', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1,bn=1)
+
 
 
         deconv2_x2 = tf.image.resize_bilinear(net_layers['deconv1'], [14, 28])
-        net_layers['deconv2'] = self.conv(deconv2_x2, 3, 256 , 128, name= 'deconv2', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['deconv2'] = self.conv(deconv2_x2, 3, 256 , 128, name= 'deconv2', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1,bn=1)
+
+
 
         deconv3_x2 = tf.image.resize_bilinear(net_layers['deconv2'], [28, 56])
-        net_layers['deconv3'] = self.conv(deconv3_x2, 3, 128 , 64, name= 'deconv3', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['deconv3'] = self.conv(deconv3_x2, 3, 128 , 64, name= 'deconv3', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1,bn=1)
+
+
 
         deconv4_x2 = tf.image.resize_bilinear(net_layers['deconv3'], [56, 112])
-        net_layers['deconv4'] = self.conv(deconv4_x2, 5, 64 , 32, name= 'deconv4', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
+        net_layers['deconv4'] = self.conv(deconv4_x2, 5, 64 , 32, name= 'deconv4', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2,bn=1)
+
+
 
         deconv5_x2 = tf.image.resize_bilinear(net_layers['deconv4'], [112, 224])
-        net_layers['deconv5'] = self.conv(deconv5_x2, 5, 32 , 16, name= 'deconv5', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2)
+        net_layers['deconv5'] = self.conv(deconv5_x2, 5, 32 , 16, name= 'deconv5', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2,bn=1)
+
+
         
         deconv6_x2 = tf.image.resize_bilinear(net_layers['deconv5'], [224, 448])
         net_layers['deconv6'] = tf.nn.tanh(self.conv(deconv6_x2, 5, 16 , 3, name= 'deconv6', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1, pad_num=2))
 
+
         net_layers['predImg'] = net_layers['deconv6']
+
+
 
         deconv_x2_mask = tf.image.resize_bilinear(net_layers['deconv5'], [224, 448])
 
