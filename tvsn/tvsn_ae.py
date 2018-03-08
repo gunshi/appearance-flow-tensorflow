@@ -728,7 +728,11 @@ class Net_tvsn(object):
         ref_exp_mask = tf.constant(ref_exp_mask, dtype=tf.float32)
         return ref_exp_mask
 
-    def reconstruction_loss(self,real_images,generated_images):
+    def reconstruction_loss(self,real_images,generated_images,mask):
+	curr_exp = tf.nn.softmax(mask)
+        #curr_proj_error = tf.abs(real_images - generated_images)
+        #pixel_loss = tf.reduce_mean(curr_proj_error * tf.expand_dims(curr_exp[:,:,:,1], -1))
+        self.masks = curr_exp[:,:,:,1]
         return tf.reduce_mean(tf.abs(real_images - generated_images))
     
     def compute_exp_reg_loss(self, pred, ref):
@@ -741,7 +745,7 @@ class Net_tvsn(object):
         return tf.image.total_variation(generated_images) 
 
     def loss_ae(self):
-	return self.reconstruction_loss(self.tgts, self.tgt_imgs)
+	return self.reconstruction_loss(self.tgts, self.tgt_imgs,self.net_layers['deconv_mask'])
 
     def loss_doafn(self):
         return self.reconstruction_loss_exp( self.tgts, self.tgt_imgs, self.net_layers['deconv_mask'])
@@ -767,7 +771,7 @@ class Net_tvsn(object):
         print('.......')
         print(self.tgts.get_shape())
         with tf.name_scope("loss"):
-          self.loss = self.loss_doafn()
+          self.loss = self.loss_ae()
 
 
         tf.summary.scalar('loss', self.loss)

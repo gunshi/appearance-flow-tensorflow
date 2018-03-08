@@ -61,7 +61,7 @@ tf.flags.DEFINE_string("outputs_dir", "/scratch/tushar.vaidya/afn/outputs/", "Su
 tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
 tf.flags.DEFINE_integer("batches_train", 900 , "batches for train")
-tf.flags.DEFINE_integer("batches_test", 50, "batches for test")
+tf.flags.DEFINE_integer("batches_test", 10, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
 tf.flags.DEFINE_boolean("multi_view_training", False, "Training ConvNet (Default: False)")
 
@@ -218,7 +218,7 @@ with tf.Graph().as_default():
 		#outputs[i][:,:,:] = outputs[i][:,:,::-1]
 		#outputs[i] = (outputs[i]*127.5)+127.5
 		#masks[i] = masks[i]*255
-                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_mask.png', masks[i])
+                #imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_mask.png', masks[i])
 
                 imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
                 imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
@@ -264,7 +264,7 @@ with tf.Graph().as_default():
             #outputs[i][:,:,:] = outputs[i][:,:,::-1]
             #outputs[i] = (outputs[i]*127.5)+127.5
             #masks[i] = masks[i]*255
-            imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_maskeval.png', masks[i])
+            #imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_maskeval.png', masks[i])
 
             imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_outputeval.png', outputs[i])
             imsave(FLAGS.synthia_image_save_path+str(dev_iter)+'_'+str(img_num)+'_targeteval.png', tgt_batch[i])
