@@ -733,7 +733,7 @@ class Net_tvsn(object):
         #curr_proj_error = tf.abs(real_images - generated_images)
         #pixel_loss = tf.reduce_mean(curr_proj_error * tf.expand_dims(curr_exp[:,:,:,1], -1))
         self.masks = curr_exp[:,:,:,1]
-        return tf.reduce_mean(tf.abs(real_images - generated_images))
+        return 50*tf.reduce_mean(tf.abs(real_images - generated_images))
     
     def compute_exp_reg_loss(self, pred, ref):
         l = tf.nn.softmax_cross_entropy_with_logits(

@@ -49,7 +49,7 @@ tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 2
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
 tf.flags.DEFINE_string("loss", "contrastive", "Type of Loss function")
 tf.flags.DEFINE_boolean("is_train", False, "Training ConvNet (Default: False)")
-tf.flags.DEFINE_float("lr", 0.0001, "learning-rate(default: 0.00001)")
+tf.flags.DEFINE_float("lr", 0.001, "learning-rate(default: 0.00001)")
 
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow device soft device placement")
@@ -209,7 +209,7 @@ with tf.Graph().as_default():
 
 
 
-        if(train_iter%800==0):
+        if(train_iter%600==0):
             outputs,masks, _, step, loss, summary = sess.run([convModel.tgts,convModel.masks, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
 	    #process outputs to get them in range, swap channels

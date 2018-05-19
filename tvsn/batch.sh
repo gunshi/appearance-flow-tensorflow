@@ -17,6 +17,6 @@ echo $SLURM_NODELIST
 
 #source activate conda_2_7
 
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python train_ae.py --name ae_doafn_aspectwide_nobn
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python train_ae.py --name ae_doafn_wide
 
 
