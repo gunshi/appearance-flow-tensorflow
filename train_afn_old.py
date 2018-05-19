@@ -21,8 +21,8 @@ tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (defau
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
 
 tf.flags.DEFINE_string("dataset_to_use", "", "training folder")
-tf.flags.DEFINE_string("kitti_odom_path", "/scratch/tushar.vaidya/kitti/poses/", "training folder")
-tf.flags.DEFINE_string("kitti_parentpath", "/scratch/tushar.vaidya/kitti/sequences/", "training folder")
+tf.flags.DEFINE_string("kitti_odom_path", "/scratch/gourav4548/kitti/poses/", "training folder")
+tf.flags.DEFINE_string("kitti_parentpath", "/scratch/gourav4548/kitti/sequences/", "training folder")
 tf.flags.DEFINE_string("synthia_parentpath", "", "training folder")
 tf.flags.DEFINE_string("synthia_configpath", "", "training folder")
 
@@ -32,7 +32,7 @@ tf.flags.DEFINE_string("name", "result", "prefix names of the output files(defau
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 30, "Batch Size (default: 10)")
 tf.flags.DEFINE_integer("sample_range", 5, "Batch Size (default: 10)")
-tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
+tf.flags.DEFINE_integer("num_epochs", 30, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
 tf.flags.DEFINE_string("loss", "contrastive", "Type of Loss function")
 tf.flags.DEFINE_boolean("is_train", False, "Training ConvNet (Default: False)")
@@ -41,7 +41,7 @@ tf.flags.DEFINE_float("lr", 0.0001, "learning-rate(default: 0.00001)")
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
-tf.flags.DEFINE_string("summaries_dir", "/scratch/tushar.vaidya/afn/outputs/summaries/", "Summary storage")
+tf.flags.DEFINE_string("summaries_dir", "/scratch/gourav4548/afn/summaries/", "Summary storage")
 
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "", "pre-trained checkpoint path")
@@ -121,7 +121,7 @@ with tf.Graph().as_default():
     print("defined gradient summaries")
     # Output directory for models and summaries
     timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join("/scratch/tushar.vaidya/afn/outputs/", "runs", FLAGS.name))
+    out_dir = os.path.abspath(os.path.join("/scratch/gourav4548/afn/", "runs", FLAGS.name))
     print("Writing to {}\n".format(out_dir))
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
@@ -179,10 +179,10 @@ with tf.Graph().as_default():
             outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
             for i in range(len(outputs)):
-                imsave('/scratch/tushar.vaidya/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
-                imsave('/scratch/tushar.vaidya/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
+                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
+                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
                 for j in range(len(src_batch)):
-                    imsave('/scratch/tushar.vaidya/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
+                    imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
                 img_num+=1
         else:
              _, step, loss, summary = sess.run([tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)

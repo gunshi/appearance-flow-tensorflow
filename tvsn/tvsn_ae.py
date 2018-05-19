@@ -574,7 +574,9 @@ class Net_tvsn(object):
         print(tf.shape(net_layers['Convolution6']))
         ##add fcs for bottleneck with transform info
         net_layers['fc_conv6'] = self.fc(net_layers['Convolution6'], 4*7*512 , 2048, name='fc_conv6', relu = 1)
-        net_layers['view_fc1'] = self.fc(self.tform, 6 , 128, name='view_fc1', relu = 1)
+        
+	"""
+	net_layers['view_fc1'] = self.fc(self.tform, 6 , 128, name='view_fc1', relu = 1)
         net_layers['view_fc2'] = self.fc(net_layers['view_fc1'], 128 , 256, name='view_fc2', relu = 1)
         print(net_layers['fc_conv6'].shape)
         print(net_layers['view_fc2'].shape)
@@ -583,9 +585,11 @@ class Net_tvsn(object):
 
         net_layers['de_fc1'] = self.fc(net_layers['view_concat'], 2304 , 2048, name='de_fc1', relu = 1,bn=1)
         
-        net_layers['de_fc1'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc1'], self.keep_prob) , lambda: net_layers['de_fc1'])
-        
-        net_layers['de_fc2'] = self.fc(net_layers['de_fc1'], 2048 , 2048, name='de_fc2', relu = 1,bn=1)
+
+        net_layers['de_fc1'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['fc_conv6'], self.keep_prob) , lambda: net_layers['de_fc1'])
+        """
+
+        net_layers['de_fc2'] = self.fc(net_layers['fc_conv6'], 2048 , 2048, name='de_fc2', relu = 1,bn=1)
         
         net_layers['de_fc2'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc2'], self.keep_prob) , lambda: net_layers['de_fc2'])
 
@@ -733,7 +737,7 @@ class Net_tvsn(object):
         #curr_proj_error = tf.abs(real_images - generated_images)
         #pixel_loss = tf.reduce_mean(curr_proj_error * tf.expand_dims(curr_exp[:,:,:,1], -1))
         self.masks = curr_exp[:,:,:,1]
-        return tf.reduce_mean(tf.abs(real_images - generated_images))
+        return 50*tf.reduce_mean(tf.abs(real_images - generated_images))
     
     def compute_exp_reg_loss(self, pred, ref):
         l = tf.nn.softmax_cross_entropy_with_logits(
@@ -745,7 +749,7 @@ class Net_tvsn(object):
         return tf.image.total_variation(generated_images) 
 
     def loss_ae(self):
-	return self.reconstruction_loss(self.tgts, self.tgt_imgs,self.net_layers['deconv_mask'])
+	return self.reconstruction_loss(self.tgts, self.input_imgs,self.net_layers['deconv_mask'])
 
     def loss_doafn(self):
         return self.reconstruction_loss_exp( self.tgts, self.tgt_imgs, self.net_layers['deconv_mask'])

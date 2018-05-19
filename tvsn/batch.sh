@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:3
 #SBATCH --mem-per-cpu=9048
 #SBATCH --time=4-00:00:00
-#SBATCH -w gnode03
+#SBATCH -w gnode39
 
 module add cuda/8.0 
 module add cudnn/6-cuda-8.0
@@ -17,6 +17,6 @@ echo $SLURM_NODELIST
 
 #source activate conda_2_7
 
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python train_ae.py --name ae_doafn_aspectwide_nobn
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python train_ae.py --name ae
 
 

@@ -28,15 +28,15 @@ tf.flags.DEFINE_string("kitti_odom_path", "/home/tushar/dataset/Datasets/Kitti_B
 tf.flags.DEFINE_string("kitti_parentpath", "/home/tushar/dataset/Datasets/Kitti_BagFiles/dataset/sequences/", "training folder")
 
 #synthia paths
-tf.flags.DEFINE_string("synthia_parentpath", "/scratch/tushar.vaidya/synthia/", "training folder")
+tf.flags.DEFINE_string("synthia_parentpath", "/scratch/gourav4548/synthia/", "training folder")
 tf.flags.DEFINE_string("synthia_configpath", "SYNTHIA_data.txt", "training folder")
 tf.flags.DEFINE_string("synthia_frame_info_path", "FRAMES_SYNTHIA.txt", "training folder")
 tf.flags.DEFINE_string("synthia_odom_path", "CameraParams/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_rgb_path", "RGB/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_semseg_path", "GT/COLOR/Stereo_Left/", "training folder")
 tf.flags.DEFINE_string("synthia_depth_path", "Depth/Stereo_Left/", "training folder")
-tf.flags.DEFINE_string("synthia_output_save_path", "/scratch/tushar.vaidya/afn/outputs/", "training folder")
-tf.flags.DEFINE_string("synthia_image_save_path", "/scratch/tushar.vaidya/afn/outputs/imgs/", "training folder")
+tf.flags.DEFINE_string("synthia_output_save_path", "/scratch/gourav4548/afn/outputs/", "training folder")
+tf.flags.DEFINE_string("synthia_image_save_path", "/scratch/gourav4548/afn/outputs/imgs/", "training folder")
 
 
 tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)")
@@ -49,13 +49,13 @@ tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 2
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
 tf.flags.DEFINE_string("loss", "contrastive", "Type of Loss function")
 tf.flags.DEFINE_boolean("is_train", False, "Training ConvNet (Default: False)")
-tf.flags.DEFINE_float("lr", 0.0001, "learning-rate(default: 0.00001)")
+tf.flags.DEFINE_float("lr", 0.001, "learning-rate(default: 0.00001)")
 
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
-tf.flags.DEFINE_string("summaries_dir", "/scratch/tushar.vaidya/afn/outputs/summaries/", "Summary storage")
-tf.flags.DEFINE_string("outputs_dir", "/scratch/tushar.vaidya/afn/outputs/", "Summary storage")
+tf.flags.DEFINE_string("summaries_dir", "/scratch/gourav4548/afn/outputs/summaries/", "Summary storage")
+tf.flags.DEFINE_string("outputs_dir", "/scratch/gourav4548/afn/outputs/", "Summary storage")
 
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
