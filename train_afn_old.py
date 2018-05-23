@@ -50,6 +50,8 @@ tf.flags.DEFINE_integer("batches_train", 6000 , "batches for train")
 tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
 tf.flags.DEFINE_boolean("multi_view_training", False, "Training ConvNet (Default: False)")
+tf.flags.DEFINE_boolean("use_t_matrix", False, "Training ConvNet (Default: False)")
+tf.flags.DEFINE_boolean("append_t_to_img", False, "Training ConvNet (Default: False)")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -110,6 +112,13 @@ with tf.Graph().as_default():
     tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
     # keep track of gradient values and sparsity (optional)
+    """
+    training_summary = tf.summary.scalar('Training loss', training_loss)
+    validation_summary = tf.summary.scalar('Validation loss', validation_loss)
+    merge_train = tf.summary.merge([training_summary] + var_summaries)
+    merge_val = tf.summary.merge([validation_summary])
+    """
+
     grad_summaries = []
     for g, v in grads_and_vars:
         if g is not None:
@@ -179,10 +188,10 @@ with tf.Graph().as_default():
             outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
             for i in range(len(outputs)):
-                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
-                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
+                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_output_train.png', outputs[i])
+                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_target_train.png', tgt_batch[i])
                 for j in range(len(src_batch)):
-                    imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
+                    imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_input_train'+str(j)+'.png', src_batch[j][i])
                 img_num+=1
         else:
              _, step, loss, summary = sess.run([tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
@@ -210,6 +219,20 @@ with tf.Graph().as_default():
 
 
         step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
+
+
+
+            outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
+            img_num=0
+            for i in range(len(outputs)):
+                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_output_dev.png', outputs[i])
+                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_target_dev.png', tgt_batch[i])
+                for j in range(len(src_batch)):
+                    imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_input_dev'+str(j)+'.png', src_batch[j][i])
+                img_num+=1
+
+
+
 
         time_str = datetime.datetime.now().isoformat()
 
