@@ -68,9 +68,13 @@ class Net(object):
         net_layers['input_stack'] = tf.concat([self.input_imgs, self.tform], 3)
 
         #mean is already subtracted in helper.py as part of preprocessing
-        # Conv-Layers
+        #Conv-Layers
 
-        net_layers['Convolution1'] = self.conv(net_layers['input_stack'], 3, 9 , 32, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+
+#maybe add another conv here?? to take from 6 to 16 or something like that
+        net_layers['Convolution0'] = self.conv(net_layers['input_stack'], 3, 9 , 16, name= 'Convolution0', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
+
+        net_layers['Convolution1'] = self.conv(net_layers['Convolution0'], 3, 16 , 32, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution2'] = self.conv(net_layers['Convolution1'], 3, 32 , 64, name= 'Convolution2', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 3, 64 , 128, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
         net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 128 , 256, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
@@ -102,13 +106,131 @@ class Net(object):
         ##function will handle steps of resizing and adding
         #remap using bilinear on (flow(deconv6) and input_imgs) to get predImg
         net_layers['predImg']=bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
-        #add coords
-        #resize
-        #call tf resampler
         
         self.net_layers = net_layers
 
 
+    def model_append(self):
+        #placeholder for a random set of <batch_size> images of fixed size -- 224,224
+        self.input_imgs = tf.placeholder(tf.float32, shape = [None, 224, 224, 3], name = "input_imgs")
+        self.input_batch_size = tf.shape(self.input_imgs)[0]  # Returns a scalar `tf.Tensor`
+        assert(self.input_batch_size == self.batch_size)
+        self.tform = tf.placeholder(tf.float32, shape = [None, 12], name = "tform") #or 6
+
+        # Conv-Layers
+        net_layers={}
+        net_layers['Convolution1'] = self.conv(self.input_imgs_m, 3, 3 , 16, name= 'Convolution1', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['Convolution2'] = self.conv(net_layers['Convolution1'], 3, 16 , 32, name= 'Convolution2', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['Convolution3'] = self.conv(net_layers['Convolution2'], 3, 32 , 64, name= 'Convolution3', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['Convolution4'] = self.conv(net_layers['Convolution3'], 3, 64 , 128, name= 'Convolution4', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['Convolution5'] = self.conv(net_layers['Convolution4'], 3, 128 , 256, name= 'Convolution5', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+        net_layers['Convolution6'] = self.conv(net_layers['Convolution5'], 3, 256 , 512, name= 'Convolution6', strides=[1,2,2,1] ,padding='VALID', groups=1,pad_input=1)
+
+
+        ##input sizes!!
+        net_layers['fc1'] = self.fc(net_layers['Convolution6'], 8*8*512 , 4096, name='fc1', relu = 1)
+        if self.is_train:
+            net_layers['fc1'] = tf.nn.dropout(net_layers['fc1'], self.keep_prob)
+
+        net_layers['fc2'] = self.fc(net_layers['fc1'], 4096 , 4096, name='fc2', relu = 1)
+        if self.is_train:
+            net_layers['fc2'] = tf.nn.dropout(net_layers['fc2'], self.keep_prob)
+
+        net_layers['fc3'] = self.fc(self.tform, 20 , 128, name='fc3', relu = 1)
+        net_layers['fc4'] = self.fc(net_layers['fc3'], 128 , 256, name='fc4', relu = 1)
+
+
+
+        net_layers['feat'] = tf.concat([net_layers['fc2'], net_layers['fc4']], 0)
+
+
+
+
+
+
+
+        
+        net_layers['fc5'] = self.fc(net_layers['feat'], 4352 , 4096, name='fc5', relu = 1)
+        net_layers['fc6'] = self.fc(net_layers['fc5'], 4096 , 4096, name='fc6', relu = 1)
+        net_layers['fc6_rs'] = tf.reshape(net_layers['fc6'],shape=[-1, 8, 8, 64], name='fc6_rs')
+
+        #deconv
+        net_layers['deconv1']  = self._upscore_layer(net_layers['fc6_rs'], shape=tf.shape(bgr),
+                                           num_classes=256,
+                                           debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
+
+        net_layers['deconv2']  = self._upscore_layer(net_layers['deconv1'], shape=tf.shape(bgr),
+                                           num_classes=128,
+                                           debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
+
+        net_layers['deconv3']  = self._upscore_layer(net_layers['deconv2'], shape=tf.shape(bgr),
+                                           num_classes=64,
+                                           debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
+
+        net_layers['deconv4']  = self._upscore_layer(net_layers['deconv3'], shape=tf.shape(bgr),
+                                           num_classes=32,
+                                           debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
+        net_layers['deconv5']  = self._upscore_layer(net_layers['deconv4'], shape=tf.shape(bgr),
+                                           num_classes=16,
+                                           debug=debug, name='deconv1', ksize=3, stride=2, pad_input=1)
+        net_layers['deconv6']  = self._upscore_layer(net_layers['deconv5'], shape=tf.shape(bgr),
+                                           num_classes=2,
+                                           debug=debug, name='deconv1', ksize=3, stride=1, pad_input=1)
+
+       #resize to 224 224 to give flow(deconv6) - not needed-function will handle
+       ##add gxy to flow to get coords !! not needed -function will handle
+       #remap using bilinear on (flow(deconv6) and input_imgs) to get predImg
+       net_layers['predImg']=bilinear_sampler(self.input_imgs,net_layers['deconv6'], resize=True)
+
+
+
+
+
+
+
+
+       net_layers['fc7'] = self.fc(net_layers['feat'], 4352 , 1024, name='fc7', relu = 1)
+       net_layers['fc8'] = self.fc(net_layers['fc7'], 1024 , 1024, name='fc8', relu = 1)
+       #reshape 8x8x16
+       net_layers['fc8_rs'] = tf.reshape(net_layers['fc6'],shape=[-1, 8, 8, 16], name='fc8_rs')
+
+        net_layers['deconv7']  = self._upscore_layer(net_layers['fc8_rs'], shape=tf.shape(bgr),
+                                           num_classes=256,
+                                           debug=debug, name='deconv7', ksize=3, stride=2, pad_input=1)
+
+        net_layers['deconv8'] = self._upscore_layer(net_layers['deconv7'], shape=tf.shape(bgr),
+                                           num_classes=128,
+                                           debug=debug, name='deconv8', ksize=3, stride=2, pad_input=1)
+
+        net_layers['deconv9']  = self._upscore_layer(net_layers['deconv8'], shape=tf.shape(bgr),
+                                           num_classes=64,
+                                           debug=debug, name='deconv9', ksize=3, stride=2, pad_input=1)
+
+        net_layers['deconv10']  = self._upscore_layer(net_layers['deconv9'], shape=tf.shape(bgr),
+                                           num_classes=32,
+                                           debug=debug, name='deconv10', ksize=3, stride=2, pad_input=1)
+        net_layers['deconv11']  = self._upscore_layer(net_layers['deconv10'], shape=tf.shape(bgr),
+                                           num_classes=16,
+                                           debug=debug, name='deconv11', ksize=3, stride=2, pad_input=1)
+
+
+        net_layers['deconv12'] = self._upscore_layer(net_layers['deconv11'], shape=tf.shape(bgr),
+                                           num_classes=2,
+                                           debug=debug, name='deconv12', ksize=3, stride=1, pad_input=1, relu=0)
+
+        net_layers['deconv12_rs'] = tf.image.resize_bilinear(net_layers['deconv12'], [224, 224], name='deconv12_rs') ##make 224 as param
+        net_layers['predmask_SM'] = tf.nn.softmax(net_layers['deconv12_rs'], name='predmask_SM')
+
+
+
+
+        self.net_layers = net_layers
+ 
+
+#add masks to both
+#add switch for masked loss or define both
+#add code for bottleneck append
+#set up route for tform sending
 
     def _upscore_layer(self, bottom, shape,num_classes, name, debug, ksize=3, stride=2, pad_input=1, relu=1):
 
@@ -178,7 +300,7 @@ class Net(object):
         The reconstruction loss is defined as the sum of the L1 distances
         between the target images and their generated counterparts
         """
-        return tf.reduce_mean(tf.abs(real_images - generated_images))
+        return 100.0*tf.reduce_mean(tf.abs(real_images - generated_images))
 
 
     def __init__(self, batch_size, trainable):

@@ -70,8 +70,8 @@ if FLAGS.kitti_parentpath==None:
 
 seqs=[ i for i in range(0,FLAGS.numseqs) ]
 #break into train and test
-seqstrain=seqs[0:10]
-seqstest=seqs[10:]
+seqstrain=seqs[0:5]
+seqstest=seqs[5:]
 
 #hard coded for now, add method to compute TODO
 imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200}#,11:920}
@@ -112,12 +112,15 @@ with tf.Graph().as_default():
     tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
     # keep track of gradient values and sparsity (optional)
-    """
-    training_summary = tf.summary.scalar('Training loss', training_loss)
-    validation_summary = tf.summary.scalar('Validation loss', validation_loss)
-    merge_train = tf.summary.merge([training_summary] + var_summaries)
+
+
+
+    
+    training_summary = tf.summary.scalar('Training loss', convModel.loss)
+    validation_summary = tf.summary.scalar('Validation loss', convModel.loss)
+    merge_train = tf.summary.merge([training_summary])
     merge_val = tf.summary.merge([validation_summary])
-    """
+   
 
     grad_summaries = []
     for g, v in grads_and_vars:
@@ -218,19 +221,14 @@ with tf.Graph().as_default():
 
 
 
-        step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
-
-
-
-            outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
-            img_num=0
-            for i in range(len(outputs)):
-                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_output_dev.png', outputs[i])
-                imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_target_dev.png', tgt_batch[i])
-                for j in range(len(src_batch)):
-                    imsave('/scratch/gourav4548/afn/outputs/imgs/'+str(train_iter)+'_'+str(img_num)+'_input_dev'+str(j)+'.png', src_batch[j][i])
-                img_num+=1
-
+        step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts], feed_dict)
+        img_num=0
+        for i in range(len(outputs)):
+            imsave('/scratch/gourav4548/afn/outputs/imgs/dev/'+str(train_iter)+'_'+str(img_num)+'_output_dev.png', outputs[i])
+            imsave('/scratch/gourav4548/afn/outputs/imgs/dev/'+str(train_iter)+'_'+str(img_num)+'_target_dev.png', tgt_batch[i])
+            for j in range(len(src_batch)):
+                imsave('/scratch/gourav4548/afn/outputs/imgs/dev/'+str(train_iter)+'_'+str(img_num)+'_input_dev'+str(j)+'.png', src_batch[j][i])
+            img_num+=1
 
 
 

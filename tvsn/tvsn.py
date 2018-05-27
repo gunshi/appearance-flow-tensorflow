@@ -168,6 +168,8 @@ class Net_tvsn(object):
 
         print(net_layers['Convolution6'].shape)
         print(tf.shape(net_layers['Convolution6']))
+
+
         ##add fcs for bottleneck with transform info
         net_layers['fc_conv6'] = self.fc(net_layers['Convolution6'], 4*7*512 , 2048, name='fc_conv6', relu = 1)
         net_layers['view_fc1'] = self.fc(self.tform, 6 , 128, name='view_fc1', relu = 1)
@@ -185,17 +187,14 @@ class Net_tvsn(object):
         
         net_layers['de_fc2'] = tf.cond(self.is_train, lambda:tf.nn.dropout(net_layers['de_fc2'], self.keep_prob) , lambda: net_layers['de_fc2'])
 
-	print(net_layers['de_fc2'].shape)
+	    print(net_layers['de_fc2'].shape)
         net_layers['de_fc3'] = self.fc(net_layers['de_fc2'], 2048 , 512*4*7, name='de_fc3', relu = 1)
         print(net_layers['de_fc3'].shape)
-	net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 7, 512], name='de_fc3_rs')
+	    net_layers['de_fc3_rs'] = tf.reshape(net_layers['de_fc3'],shape=[-1, 4, 7, 512], name='de_fc3_rs')
        
 
 
 
-
-        #check paddings! especially for 5 size kernel case!
-        #THEY HAVE DONE NEAREST NEIGHBOUR RESAMPLING NOT BILINEAR
         deconv1_x2 = tf.image.resize_bilinear(net_layers['de_fc3_rs'], [7, 14])
         net_layers['deconv1'] = self.conv(deconv1_x2, 3, 512 , 256, name= 'deconv1', strides=[1,1,1,1] ,padding='VALID', groups=1,pad_input=1)
 
@@ -575,4 +574,7 @@ class Net_tvsn(object):
 
 
         tf.summary.scalar('loss', self.loss)
+
+
+
 

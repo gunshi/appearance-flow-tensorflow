@@ -17,7 +17,7 @@ import sys
 # ==================================================
 
 tf.flags.DEFINE_integer("embedding_dim", 1000, "Dimensionality of character embedding (default: 300)")
-tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
+tf.flags.DEFINE_float("dropout_keep_prob", 0.6, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
 tf.flags.DEFINE_float("exp_reg_weight", 0.0, "L2 regularizaion lambda (default: 0.0)")
 
@@ -43,9 +43,9 @@ tf.flags.DEFINE_integer("max_frames", 20, "Maximum Number of frame (default: 20)
 tf.flags.DEFINE_string("name", "result", "prefix names of the output files(default: result)")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 15, "Batch Size (default: 10)")
-tf.flags.DEFINE_integer("sample_range", 5, "Batch Size (default: 10)")
-tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
+tf.flags.DEFINE_integer("batch_size", 20, "Batch Size (default: 10)")
+tf.flags.DEFINE_integer("sample_range", 5, "Radius (default: 10)")
+tf.flags.DEFINE_integer("num_epochs", 30, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("checkpoint_every", 1, "Save model after this many epochs (default: 100)")
 tf.flags.DEFINE_string("loss", "contrastive", "Type of Loss function")
 tf.flags.DEFINE_boolean("is_train", False, "Training ConvNet (Default: False)")
@@ -59,8 +59,8 @@ tf.flags.DEFINE_string("summaries_dir", "/scratch/tushar.vaidya/afn/outputs/summ
 #Model Parameters
 tf.flags.DEFINE_string("checkpoint_path", "./", "pre-trained checkpoint path")
 tf.flags.DEFINE_integer("numseqs", 11, "kitti sequences")
-tf.flags.DEFINE_integer("batches_train", 6000 , "batches for train")
-tf.flags.DEFINE_integer("batches_test", 200, "batches for test")
+tf.flags.DEFINE_integer("batches_train", 5000 , "batches for train")
+tf.flags.DEFINE_integer("batches_test", 8, "batches for test")
 tf.flags.DEFINE_boolean("conv_net_training", True, "Training ConvNet (Default: False)")
 tf.flags.DEFINE_boolean("multi_view_training", False, "Training ConvNet (Default: False)")
 
@@ -87,8 +87,8 @@ inpH = InputHelper()
 
 if(FLAGS.dataset_to_use=='KITTI'):
     seqs=[ i for i in range(0,FLAGS.numseqs) ]
-    seqstrain = seqs[0:10]
-    seqstest = seqs[10:]
+    seqstrain = seqs[0:6]
+    seqstest = seqs[6:]
     imgs_counts={0:4540,1:1100,2:4660,3:800,4:270,5:2760,6:1100,7:1100,8:4070,9:1590,10:1200,11:920}
     inpH.setup(FLAGS.kitti_odom_path, FLAGS.kitti_parentpath ,seqs)
 
@@ -134,6 +134,16 @@ with tf.Graph().as_default():
     tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
     # keep track of gradient values and sparsity (optional)
+
+
+
+
+    training_summary = tf.summary.scalar('Training loss', convModel.loss)
+    validation_summary = tf.summary.scalar('Validation loss', convModel.loss)
+    merge_train = tf.summary.merge([training_summary])
+    merge_val = tf.summary.merge([validation_summary])
+
+
     grad_summaries = []
     for g, v in grads_and_vars:
         if g is not None:
@@ -204,14 +214,14 @@ with tf.Graph().as_default():
 
 
 
-        if(train_iter%2000==0):
+        if(train_iter%1000==0):
             outputs, _, step, loss, summary = sess.run([convModel.tgts, tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
             img_num=0
             for i in range(len(outputs)):
-                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_output.png', outputs[i])
-                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_target.png', tgt_batch[i])
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_output_train.png', outputs[i])
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_target_train.png', tgt_batch[i])
                 for j in range(len(src_batch)):
-                    imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_input'+str(j)+'.png', src_batch[j][i])
+                    imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_input_train'+str(j)+'.png', src_batch[j][i])
                 img_num+=1
         else:
              _, step, loss, summary = sess.run([tr_op_set, global_step, convModel.loss, summaries_merged],  feed_dict)
@@ -245,6 +255,14 @@ with tf.Graph().as_default():
 
 
         step, loss, summary, outputs= sess.run([global_step, convModel.loss, summaries_merged,convModel.tgts],  feed_dict)
+
+        img_num=0
+        for i in range(len(outputs)):
+            imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_output_dev.png', outputs[i])
+            imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_target_dev.png', tgt_batch[i])
+            for j in range(len(src_batch)):
+                imsave(FLAGS.synthia_image_save_path+str(train_iter)+'_'+str(img_num)+'_input_dev'+str(j)+'.png', src_batch[j][i])
+            img_num+=1
 
         time_str = datetime.datetime.now().isoformat()
 
